@@ -77,7 +77,7 @@ namespace TexTed
             {
                 byte[] buffer = Encoding.UTF8.GetBytes(text);
                 fs.Write(buffer, 0, buffer.Length);
-                piece.FilePos = fs.Length - buffer.Length;
+                piece.FilePos = fs.Length - buffer.Length; // todo: check if correct
                 piece.Length = buffer.Length;
             }
         }
