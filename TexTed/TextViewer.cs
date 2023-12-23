@@ -33,6 +33,9 @@ namespace TexTed
                 pieceList = new PieceList(value);
             }
         }
+
+        private int selectionStart = -1;
+        private int selectionEnd = -1;
         public TextViewer()
         {
             this.caretPosition = 0;
@@ -76,6 +79,11 @@ namespace TexTed
             if (showCaret)
             {
                 DrawCaret(drawingContext, text, caretPosition, start, fontSize, typeface);
+            }
+
+            if (selectionStart != -1 && selectionEnd != -1 && selectionStart != selectionEnd)
+            {
+                DrawSelection(drawingContext, fontSize, typeface);
             }
         }
 
@@ -176,7 +184,6 @@ namespace TexTed
 
             return caretPosition;
         }
-
         private void DrawText(DrawingContext drawingContext, string text, Point start, double fontSize, Typeface typeface)
         {
             if (string.IsNullOrEmpty(text)) return;
@@ -274,12 +281,117 @@ namespace TexTed
             }
             return width;
         }
+        private void ClearSelection()
+        {
+            selectionStart = -1;
+            selectionEnd = -1;
+        }
+        private void DrawSelection(DrawingContext drawingContext, double fontSize, Typeface typeface)
+        {
+            string text = pieceList.GetAllText();
+            string[] lines = text.Split('\n');
+            int start = Math.Min(selectionStart, selectionEnd);
+            int end = Math.Max(selectionStart, selectionEnd);
+            double y = 0.0;
+            int accumulatedLength = 0;
 
+            foreach (var line in lines)
+            {
+                if (accumulatedLength + line.Length >= start)
+                {
+                    // Start of selection is in this line
+                    int lineStart = accumulatedLength > start ? 0 : start - accumulatedLength;
+                    int lineEnd = accumulatedLength + line.Length < end ? line.Length : end - accumulatedLength;
+                    string selectedText = line.Substring(lineStart, lineEnd - lineStart);
+
+                    double xStart = MeasureTextWidth(line.Substring(0, lineStart), fontSize, typeface);
+                    double xEnd = MeasureTextWidth(line.Substring(0, lineEnd), fontSize, typeface);
+
+                    Rect selectionRect = new Rect(new Point(xStart, y), new Point(xEnd, y + fontSize));
+
+                    drawingContext.DrawRectangle(new SolidColorBrush(Color.FromArgb(60, 0, 0, 255)), null, selectionRect);
+
+                    if (accumulatedLength + line.Length >= end)
+                    {
+                        break; // End of selection reached
+                    }
+                }
+
+                y += fontSize;
+                accumulatedLength += line.Length + 1;
+            }
+        }
+        protected override void OnMouseDown(MouseButtonEventArgs e)
+        {
+            base.OnMouseDown(e);
+           
+
+            Point mousePosition = e.GetPosition(this);
+
+            selectionStart = GetCaretIndexFromPoint(mousePosition);
+            selectionEnd = selectionStart;
+
+
+            CaptureMouse();
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+
+            if (e.LeftButton == MouseButtonState.Pressed && selectionStart != -1)
+            {
+                Point mousePosition = e.GetPosition(this);
+                selectionEnd = GetCaretIndexFromPoint(mousePosition);
+                InvalidateVisual(); // Redraw to show the selection
+            }
+        }
+
+        protected override void OnMouseUp(MouseButtonEventArgs e)
+        {
+            base.OnMouseUp(e);
+            ReleaseMouseCapture();
+        }
+
+        private int GetCaretIndexFromPoint(Point point)
+        {
+            Typeface typeface = new Typeface("Arial"); //todo: change
+            double fontSize = 14;//todo: change
+
+
+            string text = pieceList.GetAllText();
+            string[] lines = text.Split('\n');
+            double y = 0.0;
+            int accumulatedLength = 0;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (point.Y < y + fontSize)
+                {
+                    // point is within this line
+                    string line = lines[i];
+                    double x = 0.0;
+                    for (int j = 0; j <= line.Length; j++)
+                    {
+                        double charWidth = (j < line.Length) ? MeasureTextWidth(line[j].ToString(), fontSize, typeface) : fontSize;
+                        if (point.X <= x + (charWidth / 2)) // check if the mouse X is before the midpoint of the character
+                        {
+                            return accumulatedLength + j;
+                        }
+                        x += charWidth;
+                    }
+                    return accumulatedLength + line.Length;
+                }
+                y += fontSize;
+                accumulatedLength += lines[i].Length + 1; // +1 for the newline character
+            }
+
+            return text.Length; // in case the click is below all the lines
+        }
     }
 }
 
 // MUST HAVE TODO LIST
-//todo: add selection
 //todo: add styles/fonts  //handle styles/fonts for EACH piece, add handling at the beginning of each piece already added fields in Piece class
 //todo: add text formatting
 //todo: add undo/redo
@@ -291,3 +403,4 @@ namespace TexTed
 
 // OTHER
 //todo: other stuff from the file
+//todo: add drag&drop text file
