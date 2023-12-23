@@ -14,6 +14,7 @@ using static System.Net.Mime.MediaTypeNames;
 using System.Collections;
 using System.Data.Common;
 using System.Windows.Shapes;
+using System.Diagnostics;
 
 namespace TexTed
 {
@@ -36,6 +37,7 @@ namespace TexTed
 
         private int selectionStart = -1;
         private int selectionEnd = -1;
+
         public TextViewer()
         {
             this.caretPosition = 0;
@@ -184,6 +186,7 @@ namespace TexTed
 
             return caretPosition;
         }
+       
         private void DrawText(DrawingContext drawingContext, string text, Point start, double fontSize, Typeface typeface)
         {
             if (string.IsNullOrEmpty(text)) return;
@@ -237,6 +240,7 @@ namespace TexTed
 
             drawingContext.DrawLine(new Pen(Brushes.Black, 1), caretStart, caretEnd);
         }
+       
         private Point GetCaretLocation(string text, int caretPosition, Point start, double fontSize, Typeface typeface)
         {
             string[] lines = text.Split('\n');
@@ -281,11 +285,12 @@ namespace TexTed
             }
             return width;
         }
+       
         private void ClearSelection()
         {
             selectionStart = -1;
             selectionEnd = -1;
-        }
+        }  
         private void DrawSelection(DrawingContext drawingContext, double fontSize, Typeface typeface)
         {
             string text = pieceList.GetAllText();
@@ -321,38 +326,71 @@ namespace TexTed
                 accumulatedLength += line.Length + 1;
             }
         }
+       
         protected override void OnMouseDown(MouseButtonEventArgs e)
         {
             base.OnMouseDown(e);
-           
 
             Point mousePosition = e.GetPosition(this);
+            int clickedPosition = GetCaretIndexFromPoint(mousePosition);
 
-            selectionStart = GetCaretIndexFromPoint(mousePosition);
-            selectionEnd = selectionStart;
+            if (e.ClickCount == 1)
+            {
+                caretPosition = clickedPosition;
+                ClearSelection();
 
+                // selection
+                selectionStart = clickedPosition;
+                selectionEnd = selectionStart;
 
+            }
+            else if (e.ClickCount == 2) // selection of a word
+            {
+                (selectionStart, selectionEnd) = GetWordBoundaries(clickedPosition);
+                caretPosition = selectionEnd;
+            }
+            
+            InvalidateVisual();
             CaptureMouse();
         }
-
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
+            Point mousePosition = e.GetPosition(this);
 
             if (e.LeftButton == MouseButtonState.Pressed && selectionStart != -1)
             {
-                Point mousePosition = e.GetPosition(this);
                 selectionEnd = GetCaretIndexFromPoint(mousePosition);
-                InvalidateVisual(); // Redraw to show the selection
+                caretPosition = selectionEnd;
+                InvalidateVisual();
             }
         }
-
         protected override void OnMouseUp(MouseButtonEventArgs e)
         {
-            base.OnMouseUp(e);
+            base.OnMouseUp(e);          
             ReleaseMouseCapture();
         }
+        
+        private (int, int) GetWordBoundaries(int position)
+        {
+            string text = pieceList.GetAllText();
+            int start = position;
+            int end = position;
 
+            //start of the word
+            while (start > 0 && !char.IsWhiteSpace(text[start - 1]))
+            {
+                start--;
+            }
+
+            //end of the word
+            while (end < text.Length && !char.IsWhiteSpace(text[end]))
+            {
+                end++;
+            }
+
+            return (start, end);
+        }
         private int GetCaretIndexFromPoint(Point point)
         {
             Typeface typeface = new Typeface("Arial"); //todo: change
@@ -397,9 +435,6 @@ namespace TexTed
 //todo: add undo/redo
 //todo: add save/load
 //todo: add scroll
-//todo: long lines are not wrapped but simply clipped at the right margin
-//todo: select words with double click
-//todo: fix caret position when press enter before space  "Hello World!" -> "Hello\n World!" caret gets inside 'World'
 
 // OTHER
 //todo: other stuff from the file
