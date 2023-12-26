@@ -80,7 +80,10 @@ namespace TexTed
 
             if (showCaret)
             {
-                DrawCaret(drawingContext, text, caretPosition, start, fontSize, typeface);
+                var piece = GetPieceFromCaretPosition(caretPosition);
+
+                if (piece != null)
+                    DrawCaretN(drawingContext, caretPosition);
             }
 
             if (selectionStart != -1 && selectionEnd != -1 && selectionStart != selectionEnd)
