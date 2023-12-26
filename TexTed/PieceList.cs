@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using static System.Net.Mime.MediaTypeNames;
 using System.Windows;
+using System.Windows.Media;
+using Newtonsoft.Json;
 
 namespace TexTed
 {
@@ -27,31 +29,101 @@ namespace TexTed
             this.scratchFilePath = filePath + ".scratch";
 
             head = null;
-            LoadFromFile();
+            LoadFile();
         }
 
-        private void LoadFromFile()
+        private void LoadFile()
         {
-            if (!File.Exists(filePath))
-            {
-                File.Create(filePath);
-                return;
-            }
+            if (!File.Exists(filePath)) return;
 
-            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+            using (var reader = new StreamReader(filePath))
             {
-                StreamReader reader = new StreamReader(fs);
-                long currentPos = 0;
+                string line = reader.ReadLine();
 
-                while (!reader.EndOfStream)
+                if (line.StartsWith("{"))
                 {
-                    string line = reader.ReadLine();
-                    byte[] buffer = Encoding.UTF8.GetBytes(line + Environment.NewLine);
-                    Piece piece = new Piece(buffer.Length, filePath, currentPos, "DefaultFont", "DefaultStyle");
-                    currentPos += buffer.Length;
+                    string metadata = line;
 
-                    AddPieceToEnd(piece);
+                    while (!(line = reader.ReadLine()).Contains("<<END_METADATA>>"))
+                    {
+                        metadata += line;
+                    }
+
+                    ApplyMetadata(metadata);
                 }
+                else
+                {
+                    reader.BaseStream.Seek(0, SeekOrigin.Begin);
+                    LoadPlainText(reader);
+                }
+            }
+        }
+
+        private void ApplyMetadata(string metadata)
+        {
+            var metadataObject = JsonConvert.DeserializeObject<Metadata>(metadata);
+            long metadataLength = GetMetadataLength(metadata) + 12; //todo: fix counting
+            long currentPos = 0;
+
+            foreach (var pieceInfo in metadataObject.Pieces)
+            {
+                long filePosWithOffset = metadataLength + currentPos;
+                Piece piece = new Piece(pieceInfo.Length, filePath, filePosWithOffset, new FontFamily(pieceInfo.Font), GetStyle(pieceInfo.Style), pieceInfo.FontSize);
+                currentPos += piece.Length;
+                AddPieceToEnd(piece);
+            }
+        }
+        private long GetMetadataLength(string metadata)
+        {
+            return (metadata + "\n<<END_METADATA>>\n").Length;
+        }
+
+        private FontStyle GetStyle(string style)
+        {
+            switch (style)
+            {
+                case "Italic":
+                    return FontStyles.Italic;
+                case "Oblique":
+                    return FontStyles.Oblique;
+                default:
+                    return FontStyles.Normal;
+            }
+        }
+
+        public Piece GetHead()
+        {
+            return head;
+        }
+
+        public class Metadata
+        {
+            public List<PieceInfo> Pieces { get; set; }
+        }
+
+        public class PieceInfo
+        {
+            public int Length { get; set; }
+            public string Font { get; set; }
+            public int FontSize { get; set; }
+            public string Style { get; set; }
+        }
+
+        private void LoadPlainText(StreamReader reader)
+        {
+            int currentPos = 0;
+
+            while (!reader.EndOfStream)
+            {
+                string line = reader.ReadLine();
+
+                byte[] buffer = Encoding.UTF8.GetBytes(line + Environment.NewLine);
+
+                Piece piece = new Piece((line + Environment.NewLine).Length, filePath, currentPos, new FontFamily("Arial"), FontStyles.Normal, 12);
+
+                currentPos += buffer.Length;
+
+                AddPieceToEnd(piece);
             }
         }
 
@@ -69,6 +141,7 @@ namespace TexTed
                     current = current.Next;
                 }
                 current.Next = piece;
+                piece.Prev = current;
             }
         }
         private void WritePieceToFile(string text, Piece piece)
@@ -81,12 +154,53 @@ namespace TexTed
                 piece.Length = buffer.Length;
             }
         }
-       
-        //todo: check if needed, change 0s pos
-        public void AddPiece(string text, string font, string style)
+
+        private void SaveFile()
         {
-            Piece newPiece = new Piece(0, filePath, 0, font, style);
-           
+            var metadata = GenerateMetadata();
+
+            using (var writer = new StreamWriter(filePath))
+            {
+                writer.WriteLine(metadata);
+                writer.WriteLine();
+                writer.WriteLine("<<END_METADATA>>\n");
+
+                while (head != null)
+                {
+                    writer.Write(head.GetText());
+                    head = head.Next;
+                }
+            }
+        }
+
+        private string GenerateMetadata()
+        {
+            Metadata metadata = new Metadata();
+
+            Piece current = head;
+
+            while (current != null)
+            {
+                var pieceMetadata = new PieceInfo
+                {
+                    Length = current.Length,
+                    Font = current.Font.Source,
+                    FontSize = current.FontSize,
+                    Style = current.Style.ToString()
+                };
+
+                metadata.Pieces.Add(pieceMetadata);
+                current = current.Next;
+            }
+
+            return JsonConvert.SerializeObject(metadata);
+        }
+
+        //todo: check if needed, change 0s pos
+        public void AddPiece(string text, FontFamily font, FontStyle style, int size)
+        {
+            Piece newPiece = new Piece(0, filePath, 0, font, style, size);
+
             WritePieceToFile(text, newPiece);
 
             if (head == null)
@@ -103,7 +217,7 @@ namespace TexTed
                 current.Next = newPiece;
             }
         }
-       
+
         public string GetAllText()
         {
             StringBuilder sb = new StringBuilder();
@@ -134,7 +248,7 @@ namespace TexTed
                 int len1 = p.Length - len2;
                 p.Length = len1;
 
-                Piece q = new Piece(len2, p.File, p.FilePos + len1, p.Font, p.Style)
+                Piece q = new Piece(len2, p.File, p.FilePos + len1, p.Font, p.Style, p.FontSize)
                 {
                     Next = p.Next
                 };
@@ -149,23 +263,21 @@ namespace TexTed
         {
             Piece p = Split(pos);
 
-            // write char to the scratch file
             using (var fs = new FileStream(scratchFilePath, FileMode.Append, FileAccess.Write))
             {
                 byte[] buffer = Encoding.UTF8.GetBytes(new char[] { ch });
                 fs.Write(buffer, 0, buffer.Length);
             }
 
-            // create new piece for the char
-            Piece newPiece = new Piece(1, scratchFilePath, GetFileLength(scratchFilePath) - 1, "DefaultFont", "DefaultStyle");
 
-            // adjust linked list
+            Piece newPiece = new Piece(1, scratchFilePath, GetFileLength(scratchFilePath) - 1, p.Font, p.Style, p.FontSize);
+
             if (p != null)
             {
                 newPiece.Next = p.Next;
                 p.Next = newPiece;
             }
-            else // if insert beginning
+            else
             {
                 newPiece.Next = head;
                 head = newPiece;

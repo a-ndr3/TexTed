@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using static System.Net.Mime.MediaTypeNames;
 using System.Windows;
+using System.Windows.Media;
 
 namespace TexTed
 {
@@ -15,10 +16,12 @@ namespace TexTed
         public string File { get; internal set; }
         public long FilePos { get; internal set; }
         public Piece Next { get; set; }
-        public string Font { get; set; }
-        public string Style { get; set; }
+        public Piece Prev { get; set; }
+        public FontFamily Font { get; set; }
+        public FontStyle Style { get; set; }
+        public int FontSize { get; set; }
 
-        public Piece(int len, string file, long filePos, string font, string style)
+        public Piece(int len, string file, long filePos, FontFamily font, FontStyle style, int fontSize = 12)
         {
             Length = len;
             File = file;
@@ -26,15 +29,16 @@ namespace TexTed
             Font = font;
             Style = style;
             Next = null;
+            Prev = null;
+            FontSize = fontSize;
         }
-
 
         public string GetText()
         {
             byte[] buffer = new byte[Length];
 
             using (var fs = new FileStream(File, FileMode.Open, FileAccess.Read))
-            {
+            {              
                 fs.Seek(FilePos, SeekOrigin.Begin);
                 fs.Read(buffer, 0, Length);
                 return Encoding.UTF8.GetString(buffer);

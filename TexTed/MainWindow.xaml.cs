@@ -16,8 +16,18 @@ namespace TexTed
         public MainWindow()
         {
             InitializeComponent();
-            var filePath = "C:\\Users\\abloh\\Desktop\\sw_mos\\texted_sharp\\TexTed\\testfile.txt";
+            var filePath = "";
             textViewer.FilePath = filePath;
         }
+
+        private void verticalScrollBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            Canvas.SetTop(textViewer, -e.NewValue*this.Height);
+        }
+
+        private void horizontalScrollBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            Canvas.SetLeft(textViewer, -e.NewValue*this.Width);
+        }    
     }
 }

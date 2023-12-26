@@ -7,6 +7,10 @@
         mc:Ignorable="d"
         Title="TexTed" Height="650" Width="800">
     <Grid>
-        <local:TextViewer x:Name="textViewer" />
+        <Canvas x:Name="Canvas">
+            <local:TextViewer x:Name="textViewer" />
+        </Canvas>
+        <ScrollBar x:Name="verticalScrollBar" Orientation="Vertical" VerticalAlignment="Stretch" HorizontalAlignment="Right" ValueChanged="verticalScrollBar_ValueChanged" />
+        <ScrollBar x:Name="horizontalScrollBar" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" ValueChanged="horizontalScrollBar_ValueChanged" />
     </Grid>
 </Window>

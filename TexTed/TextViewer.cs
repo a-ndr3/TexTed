@@ -68,15 +68,39 @@ namespace TexTed
         {
             base.OnRender(drawingContext);
 
-            Typeface typeface = new Typeface("Arial");
+            var head = pieceList.GetHead();
+            double lineHeight = GetMaxHeightStartingFromPiece(head);
+            Point start = new Point(0, lineHeight);
 
-            double fontSize = 14;
+            while (head != null)
+            {
+                var typeFace = new Typeface(head.Font, head.Style, FontWeights.Normal, FontStretches.Normal);
+                string text = head.GetText();
 
-            Point start = new Point(0, fontSize);
+                string[] lines = text.Split('\n');
 
-            string text = pieceList.GetAllText();
+                GlyphTypeface glyphTypeface;
 
-            DrawText(drawingContext, text, start, fontSize, typeface);
+                if (!typeFace.TryGetGlyphTypeface(out glyphTypeface))
+                {
+                    throw new InvalidOperationException("No glyph typeface found");
+                }
+
+                foreach (var line in lines)
+                {
+                    lineHeight = GetMaxHeightStartingFromPiece(head);
+
+                    if (!string.IsNullOrEmpty(line))
+                    {
+                        DrawTextLine(drawingContext, line, start, head.FontSize, glyphTypeface);
+                        start.X += MeasureTextWidth(line, head.FontSize, typeFace);
+                    }
+
+                    if (lines.Length > 1) { start.Y += lineHeight; start.X = 0; }
+                }
+
+                head = head.Next;
+            }
 
             if (showCaret)
             {
@@ -88,10 +112,142 @@ namespace TexTed
 
             if (selectionStart != -1 && selectionEnd != -1 && selectionStart != selectionEnd)
             {
-                DrawSelection(drawingContext, fontSize, typeface);
+                //DrawSelection(drawingContext, head.FontSize, typeFace);
             }
+
         }
 
+        protected void DrawCaretN(DrawingContext drawingContext, int caretPosition)
+        {
+            var caretLocation = GetCaretPoint(caretPosition);
+            var piece = GetPieceFromCaretPosition(caretPosition);
+
+            Point caretStart;
+            Point caretEnd;
+
+            if (piece.FontSize < GetMaxHeightStartingFromPiece(piece))
+            {
+                caretStart = new Point(caretLocation.X, piece.FontSize);
+                caretEnd = new Point(caretLocation.X, 2 * piece.FontSize);
+            }
+            else
+            {
+                caretStart = new Point(caretLocation.X, piece.FontSize);
+                caretEnd = new Point(caretLocation.X, caretLocation.Y);
+            }
+
+            drawingContext.DrawLine(new Pen(Brushes.Black, 1), caretStart, caretEnd);
+        }
+
+
+        private Piece GetPieceFromCaretPosition(int caretPosition)
+        {
+            Piece currentPiece = pieceList.GetHead();
+            int accumulatedLength = 0;
+
+            while (currentPiece != null)
+            {
+                int pieceLength = currentPiece.Length;
+                if (accumulatedLength + pieceLength > caretPosition)
+                {
+                    return currentPiece;
+                }
+                accumulatedLength += pieceLength;
+                currentPiece = currentPiece.Next;
+            }
+
+            return null;
+        }
+
+        private Point GetCaretPoint(int caretPosition)
+        {
+            Piece currentPiece = pieceList.GetHead();
+            int accumulatedLength = 0;
+            double x = 0.0;
+            double y = 0.0;
+            int maxHeight = 0;
+
+            while (currentPiece != null)
+            {
+                string currentText = currentPiece.GetText();
+                int pieceLength = currentText.Length;
+                maxHeight = Math.Max(maxHeight, currentPiece.FontSize);
+
+                if (accumulatedLength + pieceLength >= caretPosition)
+                {
+                    string textUpToCaret = currentText.Substring(0, caretPosition - accumulatedLength);
+                    x += MeasureTextWidth(textUpToCaret, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+                    break;
+                }
+
+                accumulatedLength += pieceLength;
+                x += MeasureTextWidth(currentText, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+
+                if (currentText.Contains("\n"))
+                {
+                    y += maxHeight;
+                    x = 0;
+                }
+
+                currentPiece = currentPiece.Next;
+            }
+
+            return new Point(x, y);
+        }
+
+
+
+
+        private int GetMaxHeightStartingFromPiece(Piece piece)
+        {
+            var maxHeight = 1;
+            while (piece != null)
+            {
+                if (piece.FontSize > maxHeight)
+                {
+                    maxHeight = piece.FontSize;
+                    piece = piece.Next;
+                }
+                else
+                    piece = piece.Next;
+            }
+            return maxHeight;
+        }
+
+        private List<double> CalculateLineHeights()
+        {
+            List<double> lineHeights = new List<double>();
+            double currentLineHeight = 0.0;
+            Piece currentPiece = pieceList.GetHead();
+
+            while (currentPiece != null)
+            {
+                currentLineHeight = Math.Max(currentLineHeight, currentPiece.FontSize);
+                string text = currentPiece.GetText();
+
+                if (text.Contains("\n"))
+                {
+                    lineHeights.Add(currentLineHeight);
+                    currentLineHeight = 0.0;
+                }
+
+                currentPiece = currentPiece.Next;
+            }
+
+            if (currentLineHeight > 0)
+            {
+                lineHeights.Add(currentLineHeight);
+            }
+
+            return lineHeights;
+        }
+
+
+
+
+
+
+        #region Event_Controls
         protected override void OnTextInput(TextCompositionEventArgs e)
         {
             base.OnTextInput(e);
@@ -107,7 +263,6 @@ namespace TexTed
 
             InvalidateVisual();
         }
-
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
@@ -153,6 +308,52 @@ namespace TexTed
             InvalidateVisual();
 
         }
+        protected override void OnMouseDown(MouseButtonEventArgs e)
+        {
+            base.OnMouseDown(e);
+
+            Point mousePosition = e.GetPosition(this);
+            int clickedPosition = GetCaretIndexFromPoint(mousePosition);
+
+            if (e.ClickCount == 1)
+            {
+                caretPosition = clickedPosition;
+                ClearSelection();
+
+                // selection
+                selectionStart = clickedPosition;
+                selectionEnd = selectionStart;
+
+            }
+            else if (e.ClickCount == 2) // selection of a word
+            {
+                (selectionStart, selectionEnd) = GetWordBoundaries(clickedPosition);
+                caretPosition = selectionEnd;
+            }
+
+            InvalidateVisual();
+            CaptureMouse();
+        }
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            Point mousePosition = e.GetPosition(this);
+
+            if (e.LeftButton == MouseButtonState.Pressed && selectionStart != -1)
+            {
+                selectionEnd = GetCaretIndexFromPoint(mousePosition);
+                caretPosition = selectionEnd;
+                InvalidateVisual();
+            }
+        }
+        protected override void OnMouseUp(MouseButtonEventArgs e)
+        {
+            base.OnMouseUp(e);
+            ReleaseMouseCapture();
+        }
+
+        #endregion
+
 
         private int MoveCaret(Navigation direction)
         {
@@ -189,32 +390,9 @@ namespace TexTed
 
             return caretPosition;
         }
-       
-        private void DrawText(DrawingContext drawingContext, string text, Point start, double fontSize, Typeface typeface)
-        {
-            if (string.IsNullOrEmpty(text)) return;
 
-            GlyphTypeface glyphTypeface;
 
-            if (!typeface.TryGetGlyphTypeface(out glyphTypeface))
-            {
-                throw new InvalidOperationException("No glyph typeface found");
-            }
-
-            Point currentPoint = start;
-
-            string[] lines = text.Split('\n');
-
-            foreach (var line in lines)
-            {
-                if (!string.IsNullOrEmpty(line))
-                {
-                    DrawTextLine(drawingContext, line, currentPoint, fontSize, typeface, glyphTypeface);
-                }
-                currentPoint.Y += fontSize; // move to the next line
-            }
-        }
-        private void DrawTextLine(DrawingContext drawingContext, string text, Point start, double fontSize, Typeface typeface, GlyphTypeface glyphTypeface)
+        private void DrawTextLine(DrawingContext drawingContext, string text, Point start, int fontSize, GlyphTypeface glyphTypeface)
         {
             List<ushort> glyphIndexes = new List<ushort>();
             List<double> advanceWidths = new List<double>();
@@ -234,39 +412,8 @@ namespace TexTed
             GlyphRun glyphRun = new GlyphRun(glyphTypeface, 0, false, fontSize, glyphIndexes.ToArray(), start, advanceWidths.ToArray(), null, null, null, null, null, null);
             drawingContext.DrawGlyphRun(Brushes.Black, glyphRun);
         }
-        private void DrawCaret(DrawingContext drawingContext, string text, int caretPosition, Point start, double fontSize, Typeface typeface)
-        {
-            var caretLocation = GetCaretLocation(text, caretPosition, start, fontSize, typeface);
 
-            Point caretStart = new Point(caretLocation.X, caretLocation.Y - fontSize);
-            Point caretEnd = new Point(caretLocation.X, caretLocation.Y);
 
-            drawingContext.DrawLine(new Pen(Brushes.Black, 1), caretStart, caretEnd);
-        }
-       
-        private Point GetCaretLocation(string text, int caretPosition, Point start, double fontSize, Typeface typeface)
-        {
-            string[] lines = text.Split('\n');
-            double x = start.X;
-            double y = start.Y;
-            int accumulatedLength = 0;
-
-            foreach (var line in lines)
-            {
-                if (accumulatedLength + line.Length >= caretPosition)
-                {
-                    string substring = line.Substring(0, caretPosition - accumulatedLength);
-                    double lineWidth = MeasureTextWidth(substring, fontSize, typeface);
-                    x += lineWidth;
-                    break;
-                }
-
-                accumulatedLength += line.Length + 1; // +1 for the newline character
-                y += fontSize; // move to the next line
-            }
-
-            return new Point(x, y);
-        }
         private double MeasureTextWidth(string text, double fontSize, Typeface typeface)
         {
             GlyphTypeface glyphTypeface;
@@ -288,12 +435,16 @@ namespace TexTed
             }
             return width;
         }
-       
+
+
+
+        #region Selection
+
         private void ClearSelection()
         {
             selectionStart = -1;
             selectionEnd = -1;
-        }  
+        }
         private void DrawSelection(DrawingContext drawingContext, double fontSize, Typeface typeface)
         {
             string text = pieceList.GetAllText();
@@ -329,51 +480,9 @@ namespace TexTed
                 accumulatedLength += line.Length + 1;
             }
         }
-       
-        protected override void OnMouseDown(MouseButtonEventArgs e)
-        {
-            base.OnMouseDown(e);
 
-            Point mousePosition = e.GetPosition(this);
-            int clickedPosition = GetCaretIndexFromPoint(mousePosition);
 
-            if (e.ClickCount == 1)
-            {
-                caretPosition = clickedPosition;
-                ClearSelection();
 
-                // selection
-                selectionStart = clickedPosition;
-                selectionEnd = selectionStart;
-
-            }
-            else if (e.ClickCount == 2) // selection of a word
-            {
-                (selectionStart, selectionEnd) = GetWordBoundaries(clickedPosition);
-                caretPosition = selectionEnd;
-            }
-            
-            InvalidateVisual();
-            CaptureMouse();
-        }
-        protected override void OnMouseMove(MouseEventArgs e)
-        {
-            base.OnMouseMove(e);
-            Point mousePosition = e.GetPosition(this);
-
-            if (e.LeftButton == MouseButtonState.Pressed && selectionStart != -1)
-            {
-                selectionEnd = GetCaretIndexFromPoint(mousePosition);
-                caretPosition = selectionEnd;
-                InvalidateVisual();
-            }
-        }
-        protected override void OnMouseUp(MouseButtonEventArgs e)
-        {
-            base.OnMouseUp(e);          
-            ReleaseMouseCapture();
-        }
-        
         private (int, int) GetWordBoundaries(int position)
         {
             string text = pieceList.GetAllText();
@@ -396,8 +505,9 @@ namespace TexTed
         }
         private int GetCaretIndexFromPoint(Point point)
         {
-            Typeface typeface = new Typeface("Arial"); //todo: change
-            double fontSize = 14;//todo: change
+            //get font and size from piece that is closes to the point
+            var typeface = GetSpecificTypeFace(point);
+            double fontSize = typeface.XHeight;//todo: change
 
 
             string text = pieceList.GetAllText();
@@ -429,8 +539,77 @@ namespace TexTed
 
             return text.Length; // in case the click is below all the lines
         }
+        private Typeface GetSpecificTypeFace(Point point)
+        {
+            double accumulatedWidth = 0;
+            Piece currentPiece = pieceList.GetHead();
+
+            while (currentPiece != null)
+            {
+                string text = currentPiece.GetText();
+                double textWidth = MeasureTextWidth(text, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+
+                // check if the point's X coordinate falls within the current piece
+                if (point.X >= accumulatedWidth && point.X < accumulatedWidth + textWidth)
+                {
+                    return new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal);
+                }
+
+                accumulatedWidth += textWidth;
+                currentPiece = currentPiece.Next;
+            }
+
+            return new Typeface("Arial");
+        }
+
+        #endregion
+
+
+        #region NotUsed
+        //---------------NOT_USED----------------------
+        private double GetFontSizeAtPosition(Piece head, int caretPosition)
+        {
+            double defaultFontSize = 12;
+
+            int accumulatedLength = 0;
+            while (head != null)
+            {
+                int pieceEnd = accumulatedLength + head.GetText().Length;
+                if (caretPosition <= pieceEnd)
+                {
+                    return head.FontSize;
+                }
+                accumulatedLength = pieceEnd;
+                head = head.Next;
+            }
+
+            return defaultFontSize;
+        }
+
+
+        private double GetAllTextWidthInLine(Piece piece)
+        {
+            double result = 0.0;
+            while (piece != null)
+            {
+                if (!piece.GetText().Contains("\n"))
+                {
+                    result += MeasureTextWidth(piece.GetText(), piece.FontSize, new Typeface(piece.Font, piece.Style, FontWeights.Normal, FontStretches.Normal));
+                }
+                else
+                {
+                    result += MeasureTextWidth(piece.GetText().Substring(piece.GetText().LastIndexOf("\n")), piece.FontSize, new Typeface(piece.Font, piece.Style, FontWeights.Normal, FontStretches.Normal));
+                    break;
+                }
+                piece = piece.Prev;
+            }
+            return result;
+        }
+
+        #endregion
     }
 }
+
 
 // MUST HAVE TODO LIST
 //todo: add styles/fonts  //handle styles/fonts for EACH piece, add handling at the beginning of each piece already added fields in Piece class
@@ -438,6 +617,7 @@ namespace TexTed
 //todo: add undo/redo
 //todo: add save/load
 //todo: add scroll
+
 
 // OTHER
 //todo: other stuff from the file
