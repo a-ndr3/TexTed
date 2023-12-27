@@ -35,7 +35,16 @@ namespace TexTed
 
         public string GetText()
         {
-            byte[] buffer = new byte[Length];
+            byte[] buffer;
+            try
+            {
+                buffer = new byte[Length];
+            }
+            catch (Exception ex)
+            {
+                
+                throw;
+            }
 
             using (var fs = new FileStream(File, FileMode.Open, FileAccess.Read))
             {              

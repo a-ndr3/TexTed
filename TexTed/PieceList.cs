@@ -17,6 +17,10 @@ namespace TexTed
         private string filePath;
         private string scratchFilePath; //to handle insertion
 
+        private FontFamily defaultFont = new FontFamily("Arial");
+        private FontStyle defaultStyle = FontStyles.Normal;
+        private int defaultFontSize = 12;
+
         public PieceList(string filePath)
         {
             this.filePath = filePath;
@@ -119,7 +123,7 @@ namespace TexTed
 
                 byte[] buffer = Encoding.UTF8.GetBytes(line + Environment.NewLine);
 
-                Piece piece = new Piece((line + Environment.NewLine).Length, filePath, currentPos, new FontFamily("Arial"), FontStyles.Normal, 12);
+                Piece piece = new Piece((line + Environment.NewLine).Length, filePath, currentPos, defaultFont, defaultStyle, defaultFontSize);
 
                 currentPos += buffer.Length;
 
@@ -248,9 +252,15 @@ namespace TexTed
                 int len1 = p.Length - len2;
                 p.Length = len1;
 
+                if (len2 == -1)
+                {
+
+                }
+
                 Piece q = new Piece(len2, p.File, p.FilePos + len1, p.Font, p.Style, p.FontSize)
                 {
-                    Next = p.Next
+                    Next = p.Next,
+                    Prev = p
                 };
                 p.Next = q;
             }
@@ -276,11 +286,60 @@ namespace TexTed
             {
                 newPiece.Next = p.Next;
                 p.Next = newPiece;
+
+                if (newPiece.Next != null)
+                    newPiece.Next.Prev = newPiece;
+                
+                newPiece.Prev = p;
             }
             else
             {
                 newPiece.Next = head;
                 head = newPiece;
+            }
+        }
+
+        public void Insert2(int pos, char ch)
+        {
+            Piece p = Split(pos);
+
+            //if last piece
+            if (p != null && p.FilePos + p.Length != GetFileLength(scratchFilePath))
+            {
+                Piece q = new Piece(0, scratchFilePath, GetFileLength(scratchFilePath), p.Font, p.Style, p.FontSize);
+                q.Next = p.Next;
+                p.Next = q;
+                p = q; //last
+            }
+
+            using (var fs = new FileStream(scratchFilePath, FileMode.Append, FileAccess.Write))
+            {
+                byte[] buffer = Encoding.UTF8.GetBytes(new char[] { ch });
+                fs.Write(buffer, 0, buffer.Length);
+            }
+
+            if (p != null)
+            {
+                p.Length++;
+            }
+            else
+            {
+                //list is empty
+                p = new Piece(1, scratchFilePath, GetFileLength(scratchFilePath) - 1, defaultFont, defaultStyle, defaultFontSize);
+                if (head == null)
+                {
+                    head = p;
+                }
+                else
+                {
+                    Piece current = head;
+                    while (current.Next != null)
+                    {
+                        current = current.Next;
+                    }
+                    current.Next = p;
+                    p.Prev = current;
+                }
             }
         }
 

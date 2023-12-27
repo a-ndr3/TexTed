@@ -86,6 +86,7 @@ namespace TexTed
                     throw new InvalidOperationException("No glyph typeface found");
                 }
 
+                var i = 0;
                 foreach (var line in lines)
                 {
                     lineHeight = GetMaxHeightStartingFromPiece(head);
@@ -96,7 +97,11 @@ namespace TexTed
                         start.X += MeasureTextWidth(line, head.FontSize, typeFace);
                     }
 
-                    if (lines.Length > 1) { start.Y += lineHeight; start.X = 0; }
+                    if (i > 0)
+                    {
+                        start.Y += lineHeight; start.X = 0;
+                    }
+                    i++;
                 }
 
                 head = head.Next;
@@ -105,9 +110,14 @@ namespace TexTed
             if (showCaret)
             {
                 var piece = GetPieceFromCaretPosition(caretPosition);
+                lineHeight = GetMaxHeightStartingFromPiece(piece);
 
                 if (piece != null)
-                    DrawCaretN(drawingContext, caretPosition);
+                    DrawCaretN(drawingContext, piece, caretPosition, lineHeight);
+                else
+                {
+
+                }
             }
 
             if (selectionStart != -1 && selectionEnd != -1 && selectionStart != selectionEnd)
@@ -117,24 +127,17 @@ namespace TexTed
 
         }
 
-        protected void DrawCaretN(DrawingContext drawingContext, int caretPosition)
+        protected void DrawCaretN(DrawingContext drawingContext, Piece piece, int caretPosition, double lineHeight)
         {
             var caretLocation = GetCaretPoint(caretPosition);
-            var piece = GetPieceFromCaretPosition(caretPosition);
 
             Point caretStart;
             Point caretEnd;
 
-            if (piece.FontSize < GetMaxHeightStartingFromPiece(piece))
-            {
-                caretStart = new Point(caretLocation.X, piece.FontSize);
-                caretEnd = new Point(caretLocation.X, 2 * piece.FontSize);
-            }
-            else
-            {
-                caretStart = new Point(caretLocation.X, piece.FontSize);
-                caretEnd = new Point(caretLocation.X, caretLocation.Y);
-            }
+
+            caretStart = new Point(caretLocation.X, caretLocation.Y + lineHeight - piece.FontSize);
+            caretEnd = new Point(caretLocation.X, caretLocation.Y + lineHeight);
+
 
             drawingContext.DrawLine(new Pen(Brushes.Black, 1), caretStart, caretEnd);
         }
@@ -153,10 +156,13 @@ namespace TexTed
                     return currentPiece;
                 }
                 accumulatedLength += pieceLength;
+
+                if (currentPiece.Next == null) return currentPiece;
+
                 currentPiece = currentPiece.Next;
             }
 
-            return null;
+            return currentPiece;
         }
 
         private Point GetCaretPoint(int caretPosition)
@@ -197,19 +203,52 @@ namespace TexTed
 
 
 
-
+        //влево и врпаво до \n
         private int GetMaxHeightStartingFromPiece(Piece piece)
         {
-            var maxHeight = 1;
+            var maxHeight = 1; var localPiece = piece;
+
+            while (localPiece != null)
+            {
+                var text = localPiece.GetText();
+                var lastIndexOfn = text.LastIndexOf("\n");
+
+                if (lastIndexOfn != -1)
+                {
+                    if (text.Length != lastIndexOfn + 1)
+                    {
+                        if (localPiece.FontSize > maxHeight)
+                        {
+                            maxHeight = localPiece.FontSize;
+                        }
+                    }
+
+                    break;
+                }
+
+                if (localPiece.FontSize > maxHeight)
+                {
+                    maxHeight = localPiece.FontSize;
+                }
+
+                localPiece = localPiece.Prev;
+            }
+
             while (piece != null)
             {
+                var text = piece.GetText();
+
                 if (piece.FontSize > maxHeight)
                 {
                     maxHeight = piece.FontSize;
-                    piece = piece.Next;
                 }
-                else
-                    piece = piece.Next;
+
+                if (text.Contains("\n"))
+                {
+                    break;
+                }
+
+                piece = piece.Next;
             }
             return maxHeight;
         }
@@ -295,13 +334,14 @@ namespace TexTed
                     break;
                 case Key.Enter:
                     pieceList.Insert(caretPosition, '\n');
-                    caretPosition = MoveCaret(Navigation.DOWN);
+                    caretPosition++;
+                    //caretPosition = MoveCaret(Navigation.DOWN);
                     break;
                 case Key.Up:
-                    caretPosition = MoveCaret(Navigation.UP);
+                    //caretPosition = MoveCaret(Navigation.UP);
                     break;
                 case Key.Down:
-                    caretPosition = MoveCaret(Navigation.DOWN);
+                    //caretPosition = MoveCaret(Navigation.DOWN);
                     break;
             }
 
@@ -381,9 +421,9 @@ namespace TexTed
                 int newPosition = Math.Max(charCount - prevLineLength, charCount - prevLineLength + lineIndexInText);
                 return Math.Min(newPosition, charCount - 1); // to get position within the previous line
             }
-            else if (direction == Navigation.DOWN && currentLine < lines.Length - 1)
+            else if (direction == Navigation.DOWN && currentLine <= lines.Length)
             {
-                int nextLineLength = lines[currentLine + 1].Length;
+                int nextLineLength = lines[currentLine].Length;
                 int newPosition = charCount + lines[currentLine].Length + 1 + lineIndexInText;
                 return Math.Min(newPosition, charCount + lines[currentLine].Length + 1 + nextLineLength); //position is within the next line
             }
