@@ -33,6 +33,18 @@ namespace TexTed
             FontSize = fontSize;
         }
 
+        public Piece(string text, string file, long filePos, FontFamily font, FontStyle style, int fontSize = 12)
+        {
+            Length = Encoding.UTF8.GetByteCount(text);
+            File = file;
+            FilePos = filePos;
+            Font = font;
+            Style = style;
+            Next = null;
+            Prev = null;
+            FontSize = fontSize;
+        }
+
         public string GetText()
         {
             byte[] buffer;
@@ -47,7 +59,7 @@ namespace TexTed
             }
 
             using (var fs = new FileStream(File, FileMode.Open, FileAccess.Read))
-            {              
+            {
                 fs.Seek(FilePos, SeekOrigin.Begin);
                 fs.Read(buffer, 0, Length);
                 return Encoding.UTF8.GetString(buffer);

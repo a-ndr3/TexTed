@@ -8,6 +8,7 @@ using static System.Net.Mime.MediaTypeNames;
 using System.Windows;
 using System.Windows.Media;
 using Newtonsoft.Json;
+using System.Reflection;
 
 namespace TexTed
 {
@@ -20,6 +21,39 @@ namespace TexTed
         private FontFamily defaultFont = new FontFamily("Arial");
         private FontStyle defaultStyle = FontStyles.Normal;
         private int defaultFontSize = 12;
+
+        public class Metadata
+        {
+            public List<PieceInfo> Pieces { get; set; }
+
+            public Metadata()
+            {
+                Pieces = new List<PieceInfo>();
+            }
+        }
+
+        public class PieceInfo
+        {
+            public long Start { get; set; }
+            public int Length { get; set; }
+            public string Font { get; set; }
+            public int FontSize { get; set; }
+            public string Style { get; set; }
+        }
+
+        readonly static FieldInfo charPosField = typeof(StreamReader).GetField("_charPos", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        readonly static FieldInfo charLenField = typeof(StreamReader).GetField("_charLen", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        readonly static FieldInfo charBufferField = typeof(StreamReader).GetField("_charBuffer", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+
+        static long ActualPosition(StreamReader reader)
+        {
+            var charBuffer = (char[])charBufferField.GetValue(reader);
+            var charLen = (int)charLenField.GetValue(reader);
+            var charPos = (int)charPosField.GetValue(reader);
+
+            return reader.BaseStream.Position - reader.CurrentEncoding.GetByteCount(charBuffer, charPos, charLen - charPos);
+        }
+
 
         public PieceList(string filePath)
         {
@@ -42,7 +76,9 @@ namespace TexTed
 
             using (var reader = new StreamReader(filePath))
             {
-                string line = reader.ReadLine();
+                string? line = reader.ReadLine();
+
+                if (line == null) { LoadPlainText(reader); return; }
 
                 if (line.StartsWith("{"))
                 {
@@ -53,7 +89,9 @@ namespace TexTed
                         metadata += line;
                     }
 
-                    ApplyMetadata(metadata);
+                    var textPos = ActualPosition(reader);
+
+                    ApplyMetadata(metadata, textPos);
                 }
                 else
                 {
@@ -63,23 +101,30 @@ namespace TexTed
             }
         }
 
-        private void ApplyMetadata(string metadata)
+        private void ApplyMetadata(string metadata, long textPos)
         {
             var metadataObject = JsonConvert.DeserializeObject<Metadata>(metadata);
-            long metadataLength = GetMetadataLength(metadata) + 12; //todo: fix counting
-            long currentPos = 0;
 
             foreach (var pieceInfo in metadataObject.Pieces)
             {
-                long filePosWithOffset = metadataLength + currentPos;
-                Piece piece = new Piece(pieceInfo.Length, filePath, filePosWithOffset, new FontFamily(pieceInfo.Font), GetStyle(pieceInfo.Style), pieceInfo.FontSize);
-                currentPos += piece.Length;
+                Piece piece = new Piece(pieceInfo.Length, filePath, pieceInfo.Start + textPos, new FontFamily(pieceInfo.Font), GetStyle(pieceInfo.Style), pieceInfo.FontSize);
                 AddPieceToEnd(piece);
             }
         }
-        private long GetMetadataLength(string metadata)
+
+        public List<Piece> GetAllPieces()
         {
-            return (metadata + "\n<<END_METADATA>>\n").Length;
+            var list = new List<Piece>();
+
+            Piece current = head;
+
+            while (current != null)
+            {
+                list.Add(current);
+                current = current.Next;
+            }
+
+            return list;
         }
 
         private FontStyle GetStyle(string style)
@@ -100,35 +145,15 @@ namespace TexTed
             return head;
         }
 
-        public class Metadata
-        {
-            public List<PieceInfo> Pieces { get; set; }
-        }
-
-        public class PieceInfo
-        {
-            public int Length { get; set; }
-            public string Font { get; set; }
-            public int FontSize { get; set; }
-            public string Style { get; set; }
-        }
-
         private void LoadPlainText(StreamReader reader)
         {
-            int currentPos = 0;
+            var text = reader.ReadToEnd();
 
-            while (!reader.EndOfStream)
-            {
-                string line = reader.ReadLine();
+            byte[] buffer = Encoding.UTF8.GetBytes(text);
 
-                byte[] buffer = Encoding.UTF8.GetBytes(line + Environment.NewLine);
+            Piece piece = new Piece(buffer.Length, filePath, 0, defaultFont, defaultStyle, defaultFontSize);
 
-                Piece piece = new Piece((line + Environment.NewLine).Length, filePath, currentPos, defaultFont, defaultStyle, defaultFontSize);
-
-                currentPos += buffer.Length;
-
-                AddPieceToEnd(piece);
-            }
+            AddPieceToEnd(piece);
         }
 
         private void AddPieceToEnd(Piece piece)
@@ -148,6 +173,7 @@ namespace TexTed
                 piece.Prev = current;
             }
         }
+
         private void WritePieceToFile(string text, Piece piece)
         {
             using (var fs = new FileStream(filePath, FileMode.Append, FileAccess.Write))
@@ -166,14 +192,38 @@ namespace TexTed
             using (var writer = new StreamWriter(filePath))
             {
                 writer.WriteLine(metadata);
-                writer.WriteLine();
-                writer.WriteLine("<<END_METADATA>>\n");
+                writer.WriteLine("<<END_METADATA>>");
 
                 while (head != null)
                 {
                     writer.Write(head.GetText());
                     head = head.Next;
                 }
+            }
+        }
+
+        public void SaveFileTest()
+        {
+            var fp = "C:\\Users\\abloh\\Desktop\\sw_mos\\texted_sharp\\TexTed\\testfile_and_metadata_gen.txt";
+            var text1 = "Ahoy! ";
+            var text2 = "Matey! ";
+            var text3 = "Yarr! ";
+
+            Piece piece1 = new Piece(text1, fp, 0, defaultFont, defaultStyle, defaultFontSize);
+            Piece piece2 = new Piece(text2 + text3, fp, 6, new FontFamily("Times New Roman"), FontStyles.Italic, 24);
+
+            AddPieceToEnd(piece1);
+            AddPieceToEnd(piece2);
+
+            var metadata = GenerateMetadata();
+
+            using (var writer = new StreamWriter(fp))
+            {
+                writer.WriteLine(metadata);
+                writer.WriteLine("<<END_METADATA>>");
+
+                writer.Write(text1);
+                writer.Write(text2 + text3);
             }
         }
 
@@ -187,6 +237,7 @@ namespace TexTed
             {
                 var pieceMetadata = new PieceInfo
                 {
+                    Start = current.FilePos,
                     Length = current.Length,
                     Font = current.Font.Source,
                     FontSize = current.FontSize,
@@ -197,29 +248,7 @@ namespace TexTed
                 current = current.Next;
             }
 
-            return JsonConvert.SerializeObject(metadata);
-        }
-
-        //todo: check if needed, change 0s pos
-        public void AddPiece(string text, FontFamily font, FontStyle style, int size)
-        {
-            Piece newPiece = new Piece(0, filePath, 0, font, style, size);
-
-            WritePieceToFile(text, newPiece);
-
-            if (head == null)
-            {
-                head = newPiece;
-            }
-            else
-            {
-                Piece current = head;
-                while (current.Next != null)
-                {
-                    current = current.Next;
-                }
-                current.Next = newPiece;
-            }
+            return JsonConvert.SerializeObject(metadata, Formatting.Indented);
         }
 
         public string GetAllText()
@@ -268,7 +297,6 @@ namespace TexTed
             return p;
         }
 
-        //todo: should we create a new piece for EACH char? What to do with inserted string instead of char? Convert bunch of chars to string aka to one piece
         public void Insert(int pos, char ch)
         {
             Piece p = Split(pos);
@@ -289,7 +317,7 @@ namespace TexTed
 
                 if (newPiece.Next != null)
                     newPiece.Next.Prev = newPiece;
-                
+
                 newPiece.Prev = p;
             }
             else
@@ -297,21 +325,28 @@ namespace TexTed
                 newPiece.Next = head;
                 head = newPiece;
             }
+
         }
 
-        public void Insert2(int pos, char ch)
+        public void InsertUpdated(int pos, char ch)
         {
             Piece p = Split(pos);
 
-            //if last piece
-            if (p != null && p.FilePos + p.Length != GetFileLength(scratchFilePath))
+            //if p is not the last piece on scratch
+            if (p != null && (p.File != scratchFilePath || p.FilePos + p.Length != GetFileLength(scratchFilePath)))
             {
                 Piece q = new Piece(0, scratchFilePath, GetFileLength(scratchFilePath), p.Font, p.Style, p.FontSize);
                 q.Next = p.Next;
+                if (q.Next != null)
+                {
+                    q.Next.Prev = q;
+                }
                 p.Next = q;
-                p = q; //last
+                q.Prev = p;
+                p = q;
             }
 
+            // p is last
             using (var fs = new FileStream(scratchFilePath, FileMode.Append, FileAccess.Write))
             {
                 byte[] buffer = Encoding.UTF8.GetBytes(new char[] { ch });
@@ -322,29 +357,30 @@ namespace TexTed
             {
                 p.Length++;
             }
+            else if (head == null)
+            {
+                Piece newPiece = new Piece(1, scratchFilePath, 0, defaultFont, defaultStyle);
+
+                head = newPiece;
+            }
             else
             {
-                //list is empty
-                p = new Piece(1, scratchFilePath, GetFileLength(scratchFilePath) - 1, defaultFont, defaultStyle, defaultFontSize);
-                if (head == null)
-                {
-                    head = p;
-                }
-                else
-                {
-                    Piece current = head;
-                    while (current.Next != null)
-                    {
-                        current = current.Next;
-                    }
-                    current.Next = p;
-                    p.Prev = current;
-                }
+                throw new InvalidOperationException("Insertion fail");
             }
+        }
+
+        internal void Insert(int caretPosition, string text, FontFamily font, FontStyle style, int fontSize)
+        {
+            throw new NotImplementedException();
         }
 
         private long GetFileLength(string filePath)
         {
+            if (!File.Exists(filePath))
+            {
+                File.Create(filePath).Close();
+            }
+
             using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
             {
                 return fs.Length;

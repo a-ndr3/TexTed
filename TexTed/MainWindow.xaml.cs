@@ -16,7 +16,7 @@ namespace TexTed
         public MainWindow()
         {
             InitializeComponent();
-            var filePath = "C:\\Users\\abloh\\Desktop\\sw_mos\\texted_sharp\\TexTed\\testfile_and_metadata.txt";
+            var filePath = "C:\\Users\\abloh\\Desktop\\sw_mos\\texted_sharp\\TexTed\\testfile_and_metadata_gen.txt";
             textViewer.FilePath = filePath;
         }
 
