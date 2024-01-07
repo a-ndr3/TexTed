@@ -33,7 +33,13 @@ namespace TexTed
             {
                 pieceList = new PieceList(value);
             }
+            get
+            {
+                return pieceList.GetFilePath();
+            }
         }
+
+        public const int lineOffset = 5;
 
         private int selectionStart = -1;
         private int selectionEnd = -1;
@@ -69,7 +75,7 @@ namespace TexTed
 
             //pieceList.SaveFileTest();
 
-            var pieces = pieceList.GetAllText();
+            //var pieces = pieceList.GetAllText();
 
             var head = pieceList.GetHead();
             double lineHeight = GetLineHeight(head);
@@ -78,9 +84,10 @@ namespace TexTed
             while (head != null)
             {
                 var typeFace = new Typeface(head.Font, head.Style, FontWeights.Normal, FontStretches.Normal);
+
                 string text = head.GetText();
 
-                string[] lines = text.Split('\n');
+                var lines = text.Split('\n');
 
                 GlyphTypeface glyphTypeface;
 
@@ -96,7 +103,7 @@ namespace TexTed
 
                     if (i > 0)
                     {
-                        start.Y += lineHeight; start.X = 0;
+                        start.Y += GetLineHeight(head.Next ?? head); start.X = 0;
                     }
                     i++;
 
@@ -113,8 +120,8 @@ namespace TexTed
             if (showCaret)
             {
                 var piece = GetPieceFromCaretPosition(caretPosition);
-                var caretLocation = GetCaretPoint(caretPosition);
-                lineHeight = GetLineHeight(piece);
+                var caretLocation = GetCaretPointUpd(caretPosition);
+                lineHeight = GetLineHeight(piece.Next ?? piece);
 
                 DrawCaretN(drawingContext, piece, caretLocation, lineHeight);
             }
@@ -126,20 +133,60 @@ namespace TexTed
 
         }
 
+        public void SaveFile()
+        {
+            pieceList.SaveFile();
+            pieceList = new PieceList(FilePath); //to redraw with new pos
+        }
+
         private int GetLineHeight(Piece piece)
         {
-            int lineOffset = 5;
             return GetMaxHeightStartingFromPiece(piece) + lineOffset;
+        }
+
+        private int GetMinLineHeight(Piece piece)
+        {
+            return GetMinHeightStartingFromPiece(piece) + lineOffset;
         }
 
         protected void DrawCaretN(DrawingContext drawingContext, Piece piece, Point caretLocation, double lineHeight)
         {
-            var caretStart = new Point(caretLocation.X, caretLocation.Y + lineHeight - piece.FontSize);
-            var caretEnd = new Point(caretLocation.X, caretLocation.Y + lineHeight);
+            Point caretStart, caretEnd;
+
+            caretStart = new Point(caretLocation.X, caretLocation.Y + lineHeight - piece.FontSize);
+            caretEnd = new Point(caretLocation.X, caretLocation.Y + lineHeight);
 
             drawingContext.DrawLine(new Pen(Brushes.Black, 1), caretStart, caretEnd);
         }
 
+        private int GetCurrentLineNumber()
+        {
+            var currentPiece = pieceList.GetHead();
+            var accumulatedLength = 0;
+            var result = 0;
+
+            while (currentPiece != null)
+            {
+                int pieceLength = currentPiece.Length;
+
+                if (accumulatedLength + pieceLength >= caretPosition)
+                {
+                    if (currentPiece.GetText().Contains("\n")) result++;
+
+                    return result;
+                }
+
+                accumulatedLength += pieceLength;
+
+                if (currentPiece.GetText().Contains("\n")) result++;
+
+                if (currentPiece.Next == null) return result;
+
+                currentPiece = currentPiece.Next;
+            }
+
+            return result;
+        }
 
         private Piece GetPieceFromCaretPosition(int caretPosition)
         {
@@ -178,14 +225,14 @@ namespace TexTed
 
                 if (accumulatedLength + pieceLength >= caretPosition)
                 {
-                    string textUpToCaret = currentText.Substring(0, caretPosition - accumulatedLength);
-                    x += MeasureTextWidth(textUpToCaret, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+                    //string textUpToCaret = currentText.Substring(0, caretPosition - accumulatedLength);
+                    //x += MeasureTextWidth(textUpToCaret, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
 
-                    if (currentText.Contains("\n"))
-                    {
-                        y += lineHeight;
-                        x = 0;
-                    }
+                    //if (currentText.Contains("\n"))
+                    //{
+                    //    y += lineHeight;
+                    //    x = 0;
+                    //}
 
                     break;
                 }
@@ -197,6 +244,114 @@ namespace TexTed
                 {
                     y += lineHeight;
                     x = 0;
+                }
+
+                currentPiece = currentPiece.Next;
+            }
+
+            return new Point(x, y);
+        }
+
+        private Point GetCaretPointUpdated(int caretPosition)
+        {
+            Piece currentPiece = pieceList.GetHead();
+            int accumulatedLength = 0;
+            double x = 0.0;
+            double y = 0.0;
+            bool jumpFlag = false;
+
+            while (currentPiece != null)
+            {
+                string currentText = currentPiece.GetText();
+                var lineHeight = GetLineHeight(currentPiece);
+
+                for (int i = 0; i < currentText.Length && accumulatedLength + i < caretPosition; i++)
+                {
+                    if (currentText[i] == '\n')
+                    {
+                        y += GetLineHeight(currentPiece);
+                        x = 0;
+                        jumpFlag = true;
+                    }
+                    else
+                    {
+                        x += MeasureTextWidth(currentText[i].ToString(), currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+                    }
+                }
+
+                if (accumulatedLength + currentText.Length >= caretPosition)
+                {
+                    if (caretPosition == accumulatedLength + currentText.Length && currentText.EndsWith("\n") && !jumpFlag)
+                    {
+                        y += GetLineHeight(currentPiece.Next);
+                        x = 0;
+                    }
+                    break;
+                }
+
+                accumulatedLength += currentText.Length;
+
+                if (currentText.EndsWith("\n") && !jumpFlag)
+                {
+                    y += lineHeight;
+                    x = 0;
+                }
+
+                jumpFlag = false;
+                currentPiece = currentPiece.Next;
+            }
+
+            return new Point(x, y);
+        }
+
+        private Point GetCaretPointUpd(int caretPosition)
+        {
+            Piece currentPiece = pieceList.GetHead();
+            int accumulatedLength = 0;
+            double x = 0.0;
+            double y = 0.0;
+            double maxLineHeight = 0.0;
+
+            while (currentPiece != null)
+            {
+                string currentText = currentPiece.GetText();
+
+                var lineHeight = GetLineHeight(currentPiece);
+
+                Typeface typeface = new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal);
+
+                for (int i = 0; i < currentText.Length && accumulatedLength + i < caretPosition; i++)
+                {
+                    maxLineHeight = Math.Max(maxLineHeight, lineHeight);
+
+                    if (currentText[i] == '\n')
+                    {
+                        y += maxLineHeight;
+                        x = 0;
+                        maxLineHeight = 0;
+                    }
+                    else
+                    {
+                        x += MeasureTextWidth(currentText[i].ToString(), currentPiece.FontSize, typeface);
+                    }
+                }
+
+                if (accumulatedLength + currentText.Length >= caretPosition)
+                {
+                    if (caretPosition == accumulatedLength + currentText.Length && currentText.EndsWith("\n"))
+                    {
+                        y += maxLineHeight;
+                        x = 0;
+                    }
+                    break;
+                }
+
+                accumulatedLength += currentText.Length;
+                if (currentText.EndsWith("\n"))
+                {
+                    y += maxLineHeight;
+                    x = 0;
+                    maxLineHeight = 0;
                 }
 
                 currentPiece = currentPiece.Next;
@@ -257,37 +412,77 @@ namespace TexTed
             return maxHeight;
         }
 
-        private List<double> CalculateLineHeights()
+        private int GetMinHeightStartingFromPiece(Piece piece)
         {
-            List<double> lineHeights = new List<double>();
-            double currentLineHeight = 0.0;
+            var minHeight = 1000; var localPiece = piece;
+
+            while (localPiece != null)
+            {
+                var text = localPiece.GetText();
+                var lastIndexOfn = text.LastIndexOf("\n");
+
+                if (lastIndexOfn != -1)
+                {
+                    if (text.Length != lastIndexOfn + 1)
+                    {
+                        if (localPiece.FontSize < minHeight)
+                        {
+                            minHeight = localPiece.FontSize;
+                        }
+                    }
+
+                    break;
+                }
+
+                if (localPiece.FontSize < minHeight)
+                {
+                    minHeight = localPiece.FontSize;
+                }
+
+                localPiece = localPiece.Prev;
+            }
+
+            while (piece != null)
+            {
+                var text = piece.GetText();
+
+                if (piece.FontSize < minHeight)
+                {
+                    minHeight = piece.FontSize;
+                }
+
+                if (text.Contains("\n"))
+                {
+                    break;
+                }
+
+                piece = piece.Next;
+            }
+            return minHeight;
+        }
+
+        private List<(double, double)> CalculateLineHeights()
+        {
+            var lineHeights = new List<(double, double)>();
             Piece currentPiece = pieceList.GetHead();
 
             while (currentPiece != null)
             {
-                currentLineHeight = Math.Max(currentLineHeight, currentPiece.FontSize);
-                string text = currentPiece.GetText();
-
-                if (text.Contains("\n"))
+                if (lineHeights.Count == 0)
                 {
-                    lineHeights.Add(currentLineHeight);
-                    currentLineHeight = 0.0;
+                    lineHeights.Add((GetMinLineHeight(currentPiece), GetLineHeight(currentPiece)));
+                }
+
+                if (currentPiece.GetText().Contains("\n"))
+                {
+                    lineHeights.Add((GetMinLineHeight(currentPiece.Next), GetLineHeight(currentPiece.Next)));
                 }
 
                 currentPiece = currentPiece.Next;
             }
 
-            if (currentLineHeight > 0)
-            {
-                lineHeights.Add(currentLineHeight);
-            }
-
             return lineHeights;
         }
-
-
-
-
 
 
         #region Event_Controls
@@ -374,7 +569,7 @@ namespace TexTed
             base.OnMouseDown(e);
 
             Point mousePosition = e.GetPosition(this);
-            int clickedPosition = GetCaretIndexFromPointUpdated(mousePosition);
+            int clickedPosition = GetCaretIndexFromPoint(mousePosition);
 
             if (e.ClickCount == 1)
             {
@@ -579,9 +774,9 @@ namespace TexTed
 
             for (int i = 0; i < lines.Length; i++)
             {
-                var maxH = GetLineHeight(piece);
+                //var maxH = GetLineHeight(piece);
 
-                if (point.Y <= y + maxH)
+                if (point.Y <= y + GetLineHeight(piece))
                 {
                     // point is within this line
                     string line = lines[i];
@@ -597,7 +792,7 @@ namespace TexTed
                     }
                     return accumulatedLength + line.Length;
                 }
-                y += maxH;
+                y += GetLineHeight(piece.Next ?? piece);
                 accumulatedLength += lines[i].Length + 1; // +1 for the newline character
             }
 
@@ -738,7 +933,7 @@ namespace TexTed
                 return -1;
 
             string text = pieceList.GetAllText();
-            
+
             int index = text.IndexOf(searchString, startPosition, StringComparison.CurrentCultureIgnoreCase);
 
             return index;
@@ -760,10 +955,10 @@ namespace TexTed
                 caretPosition = foundIndex;
                 selectionStart = foundIndex;
                 selectionEnd = foundIndex + searchString.Length;
-                
+
                 InvalidateVisual();
             }
-        }     
+        }
 
         #endregion
 
@@ -829,7 +1024,7 @@ namespace TexTed
 
                     foreach (var line in currentPiece.GetText().Split(new[] { "\n" }, StringSplitOptions.None))
                     {
-                        accumulatedHeight = GetLineHeight(currentPiece);
+                        accumulatedHeight = GetLineHeight(currentPiece.Next ?? currentPiece);
                     }
                     accumulatedTextsLength += currentPiece.GetText().Length;
                     currentPiece = currentPiece.Next;
@@ -842,7 +1037,7 @@ namespace TexTed
 
                 foreach (string line in lines)
                 {
-                    double lineHeight = GetLineHeight(currentPiece);
+                    double lineHeight = GetLineHeight(currentPiece.Next ?? currentPiece);
 
                     if (accumulatedHeight + lineHeight > point.Y)
                     {
@@ -875,12 +1070,17 @@ namespace TexTed
                 double charWidth = MeasureTextWidth(line[i].ToString(), finalPiece.FontSize, typeface);
                 if (accumulatedWidth + currentWidth + charWidth > xCoord)
                 {
-                    return previousTextsLength+i;
+                    return previousTextsLength + i;
                 }
                 currentWidth += charWidth;
             }
 
             return line.Length;
+        }
+
+        internal void HandleArrowKeyPress(KeyEventArgs keyArgs)
+        {
+            OnKeyDown(keyArgs);
         }
     }
 }
