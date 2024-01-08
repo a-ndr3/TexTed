@@ -393,7 +393,45 @@ namespace TexTed
 
         internal void Insert(int caretPosition, string text, FontFamily font, FontStyle style, int fontSize)
         {
-            throw new NotImplementedException();
+            if (string.IsNullOrEmpty(text))
+                return;
+
+            Piece currentPiece = Split(caretPosition);
+            long filePos = (currentPiece != null) ? currentPiece.FilePos + currentPiece.Length : 0;
+
+            Piece newPiece = new Piece(text.Length, scratchFilePath, filePos, font, style, fontSize);
+            AddPieceToFile(text, newPiece);
+
+            if (currentPiece != null)
+            {
+                newPiece.Next = currentPiece.Next;
+                if (newPiece.Next != null)
+                {
+                    newPiece.Next.Prev = newPiece;
+                }
+                currentPiece.Next = newPiece;
+                newPiece.Prev = currentPiece;
+            }
+            else if (head == null)
+            {
+                head = newPiece;
+            }
+            else
+            {
+                newPiece.Next = head;
+                head.Prev = newPiece;
+                head = newPiece;
+            }
+        }
+
+        private void AddPieceToFile(string text, Piece piece)
+        {
+            using (var fs = new FileStream(piece.File, FileMode.Append, FileAccess.Write))
+            {
+                byte[] buffer = Encoding.UTF8.GetBytes(text);
+                fs.Write(buffer, 0, buffer.Length);
+            }
+            piece.FilePos = GetFileLength(piece.File) - text.Length;
         }
 
         private long GetFileLength(string filePath)

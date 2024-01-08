@@ -59,6 +59,7 @@ namespace TexTed
         private void openButton_Click(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*";
             if (openFileDialog.ShowDialog() == true)
             {
                 string exePath = Environment.ProcessPath;
@@ -118,6 +119,11 @@ namespace TexTed
         private void boldButton_Click(object sender, RoutedEventArgs e)
         {
             textViewer.Focus();
+        }
+
+        private void searchButton_Click(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }

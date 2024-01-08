@@ -128,7 +128,7 @@ namespace TexTed
 
             if (selectionStart != -1 && selectionEnd != -1 && selectionStart != selectionEnd)
             {
-                //DrawSelection(drawingContext, head.FontSize, typeFace);
+                DrawSelection(drawingContext);
             }
 
         }
@@ -159,35 +159,6 @@ namespace TexTed
             drawingContext.DrawLine(new Pen(Brushes.Black, 1), caretStart, caretEnd);
         }
 
-        private int GetCurrentLineNumber()
-        {
-            var currentPiece = pieceList.GetHead();
-            var accumulatedLength = 0;
-            var result = 0;
-
-            while (currentPiece != null)
-            {
-                int pieceLength = currentPiece.Length;
-
-                if (accumulatedLength + pieceLength >= caretPosition)
-                {
-                    if (currentPiece.GetText().Contains("\n")) result++;
-
-                    return result;
-                }
-
-                accumulatedLength += pieceLength;
-
-                if (currentPiece.GetText().Contains("\n")) result++;
-
-                if (currentPiece.Next == null) return result;
-
-                currentPiece = currentPiece.Next;
-            }
-
-            return result;
-        }
-
         private Piece GetPieceFromCaretPosition(int caretPosition)
         {
             Piece currentPiece = pieceList.GetHead();
@@ -208,100 +179,6 @@ namespace TexTed
             }
 
             return currentPiece;
-        }
-
-        private Point GetCaretPoint(int caretPosition)
-        {
-            Piece currentPiece = pieceList.GetHead();
-            int accumulatedLength = 0;
-            double x = 0.0;
-            double y = 0.0;
-
-            while (currentPiece != null)
-            {
-                string currentText = currentPiece.GetText();
-                int pieceLength = currentText.Length;
-                var lineHeight = GetLineHeight(currentPiece);
-
-                if (accumulatedLength + pieceLength >= caretPosition)
-                {
-                    //string textUpToCaret = currentText.Substring(0, caretPosition - accumulatedLength);
-                    //x += MeasureTextWidth(textUpToCaret, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
-
-                    //if (currentText.Contains("\n"))
-                    //{
-                    //    y += lineHeight;
-                    //    x = 0;
-                    //}
-
-                    break;
-                }
-
-                accumulatedLength += pieceLength;
-                x += MeasureTextWidth(currentText, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
-
-                if (currentText.Contains("\n"))
-                {
-                    y += lineHeight;
-                    x = 0;
-                }
-
-                currentPiece = currentPiece.Next;
-            }
-
-            return new Point(x, y);
-        }
-
-        private Point GetCaretPointUpdated(int caretPosition)
-        {
-            Piece currentPiece = pieceList.GetHead();
-            int accumulatedLength = 0;
-            double x = 0.0;
-            double y = 0.0;
-            bool jumpFlag = false;
-
-            while (currentPiece != null)
-            {
-                string currentText = currentPiece.GetText();
-                var lineHeight = GetLineHeight(currentPiece);
-
-                for (int i = 0; i < currentText.Length && accumulatedLength + i < caretPosition; i++)
-                {
-                    if (currentText[i] == '\n')
-                    {
-                        y += GetLineHeight(currentPiece);
-                        x = 0;
-                        jumpFlag = true;
-                    }
-                    else
-                    {
-                        x += MeasureTextWidth(currentText[i].ToString(), currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
-                    }
-                }
-
-                if (accumulatedLength + currentText.Length >= caretPosition)
-                {
-                    if (caretPosition == accumulatedLength + currentText.Length && currentText.EndsWith("\n") && !jumpFlag)
-                    {
-                        y += GetLineHeight(currentPiece.Next);
-                        x = 0;
-                    }
-                    break;
-                }
-
-                accumulatedLength += currentText.Length;
-
-                if (currentText.EndsWith("\n") && !jumpFlag)
-                {
-                    y += lineHeight;
-                    x = 0;
-                }
-
-                jumpFlag = false;
-                currentPiece = currentPiece.Next;
-            }
-
-            return new Point(x, y);
         }
 
         private Point GetCaretPointUpd(int caretPosition)
@@ -554,10 +431,10 @@ namespace TexTed
                     caretPosition++;
                     break;
                 case Key.Up:
-                    //caretPosition = MoveCaret(Navigation.UP);
+                    caretPosition = MoveCaret(Navigation.UP);
                     break;
                 case Key.Down:
-                    //caretPosition = MoveCaret(Navigation.DOWN);
+                    caretPosition = MoveCaret(Navigation.DOWN);
                     break;
             }
 
@@ -611,6 +488,7 @@ namespace TexTed
         #endregion
 
 
+        //todo: fix
         private int MoveCaret(Navigation direction)
         {
             string text = pieceList.GetAllText();
@@ -701,42 +579,66 @@ namespace TexTed
             selectionStart = -1;
             selectionEnd = -1;
         }
-        private void DrawSelection(DrawingContext drawingContext, double fontSize, Typeface typeface)
+
+        private void DrawSelection(DrawingContext drawingContext)
         {
-            string text = pieceList.GetAllText();
-            string[] lines = text.Split('\n');
-            int start = Math.Min(selectionStart, selectionEnd);
-            int end = Math.Max(selectionStart, selectionEnd);
-            double y = 0.0;
-            int accumulatedLength = 0;
+            int currentPos = 0;
+            Piece currentPiece = pieceList.GetHead();
+            double currentX = 0;
+            double currentY = 0;
 
-            foreach (var line in lines)
+            while (currentPiece != null)
             {
-                if (accumulatedLength + line.Length >= start)
+                string pieceText = currentPiece.GetText();
+                int pieceLength = pieceText.Length;
+
+                if (currentPos + pieceLength > selectionStart && currentPos < selectionEnd)
                 {
-                    // Start of selection is in this line
-                    int lineStart = accumulatedLength > start ? 0 : start - accumulatedLength;
-                    int lineEnd = accumulatedLength + line.Length < end ? line.Length : end - accumulatedLength;
-                    string selectedText = line.Substring(lineStart, lineEnd - lineStart);
-
-                    double xStart = MeasureTextWidth(line.Substring(0, lineStart), fontSize, typeface);
-                    double xEnd = MeasureTextWidth(line.Substring(0, lineEnd), fontSize, typeface);
-
-                    Rect selectionRect = new Rect(new Point(xStart, y), new Point(xEnd, y + fontSize));
-
-                    drawingContext.DrawRectangle(new SolidColorBrush(Color.FromArgb(60, 0, 0, 255)), null, selectionRect);
-
-                    if (accumulatedLength + line.Length >= end)
+                    string[] lines = pieceText.Split('\n');
+                    foreach (string line in lines)
                     {
-                        break; // End of selection reached
+                        int lineLength = line.Length + 1; // +1 for the newline character
+
+                        if (currentPos + lineLength > selectionStart && currentPos < selectionEnd)
+                        {
+                            int selectionInLineStart = Math.Max(selectionStart - currentPos, 0);
+                            int selectionInLineEnd = Math.Min(selectionEnd - currentPos, lineLength);
+
+                            if (selectionInLineEnd > line.Length)
+                            {
+                                selectionInLineEnd = line.Length;
+                            }
+
+                            string selectedTextInLine = line.Substring(selectionInLineStart, selectionInLineEnd - selectionInLineStart);
+
+                            double widthBeforeSelection = MeasureTextWidth(line.Substring(0, selectionInLineStart), currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+                            double selectedTextWidth = MeasureTextWidth(selectedTextInLine, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+
+                            Rect selectionRect = new Rect(new Point(currentX + widthBeforeSelection, currentY), new Size(selectedTextWidth, GetLineHeight(currentPiece)));
+                            drawingContext.DrawRectangle(new SolidColorBrush(Color.FromArgb(60, 0, 0, 255)), null, selectionRect);
+                        }
+
+                        currentPos += lineLength;
+                        currentX = 0;
+                        currentY += GetLineHeight(currentPiece);
+                    }
+                    currentX = MeasureTextWidth(pieceText, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+                }
+                else
+                {
+                    currentPos += pieceLength;
+                    currentX += MeasureTextWidth(pieceText, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+
+                    if (pieceText.Contains("\n"))
+                    {
+                        currentY += GetLineHeight(currentPiece) * pieceText.Count(x => x == '\n');
+                        currentX = 0;
                     }
                 }
 
-                y += fontSize;
-                accumulatedLength += line.Length + 1;
+                currentPiece = currentPiece.Next;
             }
         }
-
 
 
         private (int, int) GetWordBoundaries(int position)
@@ -759,93 +661,61 @@ namespace TexTed
 
             return (start, end);
         }
+
         private int GetCaretIndexFromPoint(Point point)
         {
-            //get font and size from piece that is closes to the point
-            var piece = GetSpecificPieceFromPoint(point);
-            double fontSize = piece.FontSize;
+            var defaultPoint = new Point(0, 0);
+            if (point.X <= defaultPoint.X && point.Y <= GetLineHeight(pieceList.GetHead()))
+            {
+                return 0;
+            }
 
-
-            string text = pieceList.GetAllText();
-
-            string[] lines = text.Split('\n');
+            Piece currentPiece = pieceList.GetHead();
             double y = 0.0;
+            double x = 0.0;
             int accumulatedLength = 0;
 
-            for (int i = 0; i < lines.Length; i++)
+            while (currentPiece != null)
             {
-                //var maxH = GetLineHeight(piece);
+                string currentText = currentPiece.GetText();
+                string[] lines = currentText.Split('\n');
 
-                if (point.Y <= y + GetLineHeight(piece))
+                foreach (var line in lines)
                 {
-                    // point is within this line
-                    string line = lines[i];
-                    double x = 0.0;
-                    for (int j = 0; j <= line.Length; j++)
+                    if (point.Y <= y + GetLineHeight(currentPiece))
                     {
-                        double charWidth = (j < line.Length) ? MeasureTextWidth(line[j].ToString(), fontSize, new Typeface(piece.Font, piece.Style, FontWeights.Normal, FontStretches.Normal)) : fontSize;
-                        if (point.X <= x + (charWidth / 2)) // check if the mouse X is before the midpoint of the character
+                        for (int j = 0; j <= line.Length; j++)
                         {
-                            return accumulatedLength + j;
+                            double charWidth;
+                            if (j < line.Length)
+                            {
+                                charWidth = MeasureTextWidth(line[j].ToString(), currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+                            }
+                            else
+                            {
+                                charWidth = MeasureTextWidth("M", currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
+                            }
+
+                            if (point.X <= x + (charWidth / 2))
+                            {
+                                return accumulatedLength + j + 1;
+                            }
+                            x += charWidth;
                         }
-                        x += charWidth;
+
                     }
-                    return accumulatedLength + line.Length;
-                }
-                y += GetLineHeight(piece.Next ?? piece);
-                accumulatedLength += lines[i].Length + 1; // +1 for the newline character
-            }
 
-            return text.Length; // in case the click is below all the lines
-        }
+                    if (lines.Length > 1)
+                    { y += GetLineHeight(currentPiece); accumulatedLength += line.Length + 1; x = 0; }
+                    else { accumulatedLength += line.Length; } // +1 for the newline character
 
-
-        private Typeface GetSpecificTypeFace(Point point)
-        {
-            double accumulatedWidth = 0;
-            Piece currentPiece = pieceList.GetHead();
-
-            while (currentPiece != null)
-            {
-                string text = currentPiece.GetText();
-                double textWidth = MeasureTextWidth(text, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
-
-                // check if the point's X coordinate falls within the current piece
-                if (point.X >= accumulatedWidth && point.X < accumulatedWidth + textWidth)
-                {
-                    return new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal);
                 }
 
-                accumulatedWidth += textWidth;
                 currentPiece = currentPiece.Next;
             }
 
-            return new Typeface("Arial");
+            return 0;
         }
-
-        private Piece GetSpecificPieceFromPoint(Point point)
-        {
-            double accumulatedWidth = 0;
-            Piece currentPiece = pieceList.GetHead();
-
-            while (currentPiece != null)
-            {
-                string text = currentPiece.GetText();
-                double textWidth = MeasureTextWidth(text, currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
-
-                // check if the point's X coordinate falls within the current piece
-                if (point.X >= accumulatedWidth && point.X < accumulatedWidth + textWidth)
-                {
-                    return currentPiece;
-                }
-
-                accumulatedWidth += textWidth;
-                currentPiece = currentPiece.Next;
-            }
-
-            return currentPiece.Prev;
-        }
-
 
         public void SetFontAttributesForSelection(FontFamily fontFamily, int fontSize, FontStyle fontStyle)
         {
@@ -887,12 +757,55 @@ namespace TexTed
 
         private Piece GetSelectedPiece()
         {
-            throw new NotImplementedException();
+            if (selectionStart == -1 || selectionEnd == -1 || selectionStart == selectionEnd)
+                return null;
+
+            Piece currentPiece = pieceList.GetHead();
+            int accumulatedLength = 0;
+
+            while (currentPiece != null)
+            {
+                int pieceEnd = accumulatedLength + currentPiece.Length;
+                if (pieceEnd > selectionStart)
+                {
+                    return currentPiece;
+                }
+
+                accumulatedLength = pieceEnd;
+                currentPiece = currentPiece.Next;
+            }
+
+            return null;
         }
 
         private string GetSelectedText()
         {
-            throw new NotImplementedException();
+            if (selectionStart == -1 || selectionEnd == -1 || selectionStart == selectionEnd)
+                return string.Empty;
+
+            StringBuilder selectedTextBuilder = new StringBuilder();
+            Piece currentPiece = pieceList.GetHead();
+            int accumulatedLength = 0;
+
+            while (currentPiece != null)
+            {
+                int pieceEnd = accumulatedLength + currentPiece.Length;
+                if (pieceEnd > selectionStart)
+                {
+                    int startInPiece = Math.Max(accumulatedLength, selectionStart) - accumulatedLength;
+                    int endInPiece = Math.Min(pieceEnd, selectionEnd) - accumulatedLength;
+                    string pieceText = currentPiece.GetText();
+                    selectedTextBuilder.Append(pieceText.Substring(startInPiece, endInPiece - startInPiece));
+                }
+
+                if (pieceEnd >= selectionEnd)
+                    break;
+
+                accumulatedLength = pieceEnd;
+                currentPiece = currentPiece.Next;
+            }
+
+            return selectedTextBuilder.ToString();
         }
 
         private void Cut()
@@ -962,122 +875,6 @@ namespace TexTed
 
         #endregion
 
-
-        #region NotUsed
-        //---------------NOT_USED----------------------
-        private double GetFontSizeAtPosition(Piece head, int caretPosition)
-        {
-            double defaultFontSize = 12;
-
-            int accumulatedLength = 0;
-            while (head != null)
-            {
-                int pieceEnd = accumulatedLength + head.GetText().Length;
-                if (caretPosition <= pieceEnd)
-                {
-                    return head.FontSize;
-                }
-                accumulatedLength = pieceEnd;
-                head = head.Next;
-            }
-
-            return defaultFontSize;
-        }
-
-
-        private double GetAllTextWidthInLine(Piece piece)
-        {
-            double result = 0.0;
-            while (piece != null)
-            {
-                if (!piece.GetText().Contains("\n"))
-                {
-                    result += MeasureTextWidth(piece.GetText(), piece.FontSize, new Typeface(piece.Font, piece.Style, FontWeights.Normal, FontStretches.Normal));
-                }
-                else
-                {
-                    result += MeasureTextWidth(piece.GetText().Substring(piece.GetText().LastIndexOf("\n")), piece.FontSize, new Typeface(piece.Font, piece.Style, FontWeights.Normal, FontStretches.Normal));
-                    break;
-                }
-                piece = piece.Prev;
-            }
-            return result;
-        }
-
-        #endregion
-
-
-        private int GetCaretIndexFromPointUpdated(Point point)
-        {
-            double accumulatedHeight = 0;
-            double accumulatedWidth = 0;
-            var accumulatedTextsLength = 0;
-
-            var currentPiece = pieceList.GetHead();
-            var pieceWhereCaretIs = GetSpecificPieceFromPoint(point);
-
-            while (currentPiece != null)
-            {
-                if (currentPiece != pieceWhereCaretIs)
-                {
-                    accumulatedWidth += MeasureTextWidth(currentPiece.GetText(), currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
-
-                    foreach (var line in currentPiece.GetText().Split(new[] { "\n" }, StringSplitOptions.None))
-                    {
-                        accumulatedHeight = GetLineHeight(currentPiece.Next ?? currentPiece);
-                    }
-                    accumulatedTextsLength += currentPiece.GetText().Length;
-                    currentPiece = currentPiece.Next;
-                    continue;
-                }
-
-                string text = currentPiece.GetText();
-
-                string[] lines = text.Split(new[] { "\n" }, StringSplitOptions.None);
-
-                foreach (string line in lines)
-                {
-                    double lineHeight = GetLineHeight(currentPiece.Next ?? currentPiece);
-
-                    if (accumulatedHeight + lineHeight > point.Y)
-                    {
-                        return GetCaretIndexInLine(line, accumulatedTextsLength, point.X, accumulatedWidth, currentPiece);
-                    }
-
-                    accumulatedHeight += lineHeight;
-                    accumulatedWidth += line.Length;
-
-                    if (line.Contains("\n"))
-                    {
-                        accumulatedWidth = 0;
-                    }
-                }
-
-                currentPiece = currentPiece.Next;
-            }
-
-            return -1;
-        }
-
-        private int GetCaretIndexInLine(string line, int previousTextsLength, double xCoord, double accumulatedWidth, Piece finalPiece)
-        {
-            double currentWidth = 0;
-
-            var typeface = new Typeface(finalPiece.Font, finalPiece.Style, FontWeights.Normal, FontStretches.Normal);
-
-            for (int i = 0; i < line.Length; i++)
-            {
-                double charWidth = MeasureTextWidth(line[i].ToString(), finalPiece.FontSize, typeface);
-                if (accumulatedWidth + currentWidth + charWidth > xCoord)
-                {
-                    return previousTextsLength + i;
-                }
-                currentWidth += charWidth;
-            }
-
-            return line.Length;
-        }
-
         internal void HandleArrowKeyPress(KeyEventArgs keyArgs)
         {
             OnKeyDown(keyArgs);
@@ -1087,13 +884,6 @@ namespace TexTed
 
 
 // MUST HAVE TODO LIST
-//todo: add styles/fonts  //handle styles/fonts for EACH piece, add handling at the beginning of each piece already added fields in Piece class
-//todo: add text formatting
+
 //todo: add undo/redo
-//todo: add save/load
-//todo: add scroll
-
-
-// OTHER
-//todo: other stuff from the file
 //todo: add drag&drop text file
