@@ -9,7 +9,91 @@
     },
     {
       "Start": 316,
-      "Length": 13,
+      "Length": 12,
+      "Font": "Times New Roman",
+      "FontSize": 24,
+      "Style": "Italic"
+    },
+    {
+      "Start": 328,
+      "Length": 1,
+      "Font": "Times New Roman",
+      "FontSize": 24,
+      "Style": "Italic"
+    },
+    {
+      "Start": 329,
+      "Length": 6,
+      "Font": "Arial",
+      "FontSize": 14,
+      "Style": "Normal"
+    },
+    {
+      "Start": 335,
+      "Length": 1,
+      "Font": "Arial",
+      "FontSize": 14,
+      "Style": "Normal"
+    },
+    {
+      "Start": 336,
+      "Length": 5,
+      "Font": "Arial",
+      "FontSize": 14,
+      "Style": "Normal"
+    },
+    {
+      "Start": 341,
+      "Length": 2,
+      "Font": "Courier New",
+      "FontSize": 10,
+      "Style": "Normal"
+    },
+    {
+      "Start": 343,
+      "Length": 5,
+      "Font": "Courier New",
+      "FontSize": 10,
+      "Style": "Normal"
+    },
+    {
+      "Start": 348,
+      "Length": 1,
+      "Font": "Arial",
+      "FontSize": 28,
+      "Style": "Normal"
+    },
+    {
+      "Start": 349,
+      "Length": 4,
+      "Font": "Arial",
+      "FontSize": 28,
+      "Style": "Normal"
+    },
+    {
+      "Start": 353,
+      "Length": 4,
+      "Font": "Times New Roman",
+      "FontSize": 8,
+      "Style": "Normal"
+    },
+    {
+      "Start": 357,
+      "Length": 4,
+      "Font": "Times New Roman",
+      "FontSize": 8,
+      "Style": "Normal"
+    },
+    {
+      "Start": 361,
+      "Length": 1,
+      "Font": "Arial",
+      "FontSize": 12,
+      "Style": "Normal"
+    },
+    {
+      "Start": 362,
+      "Length": 1,
       "Font": "Times New Roman",
       "FontSize": 24,
       "Style": "Italic"
@@ -17,4 +101,8 @@
   ]
 }
 <<END_METADATA>>
-Ahoy! Matey! Yarr! 
+Ahoy! Matey! Yarr!
+Ahoy! 
+Ahoy!  Ahoy!
+Ahoy!  
+Ahoy! 

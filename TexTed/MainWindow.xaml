@@ -13,7 +13,7 @@
         </Grid.RowDefinitions>
 
         <Border CornerRadius="1" BorderBrush="Transparent" Background="LightSteelBlue" BorderThickness="3.5">
-            <DockPanel Background="LightSteelBlue" Grid.Row="0" Width="495">
+            <DockPanel Background="LightSteelBlue" Grid.Row="0" Width="575">
                 <Button x:Name="openButton" Content="Open" Click="openButton_Click" ToolTip="Open file in the new window"/>
                 <Button x:Name="saveButton" Content="Save" Click="saveButton_Click" ToolTip="Save current document"/>
                 <ComboBox x:Name="fontComboBox" Width="100" SelectionChanged="fontComboBox_SelectionChanged"
@@ -49,6 +49,8 @@
                 </Button>
                 <TextBox x:Name="searchTextBox" BorderThickness="1" BorderBrush="Black" Width="120" Margin="5,0,5,0" ToolTip="Enter text to search"/>
                 <Button x:Name="searchButton" Content="Search" Click="searchButton_Click" Width="60"/>
+                <Button Content="Undo" Click="UndoButton_Click" Width="40"/>
+                <Button Content="Redo" Click="RedoButton_Click" Width="40"/>
             </DockPanel>
         </Border>
 

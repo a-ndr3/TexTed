@@ -98,32 +98,75 @@ namespace TexTed
 
         private void fontComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (fontComboBox.SelectedItem is ComboBoxItem selectedFontItem)
+            {
+                string fontFamilyName = selectedFontItem.Content.ToString();
+                FontFamily fontFamily = new FontFamily(fontFamilyName);
+
+                textViewer.SetFont(fontFamily);
+            }
+
             textViewer.Focus();
         }
 
         private void fontSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (fontSizeComboBox.SelectedItem is ComboBoxItem selectedSizeItem)
+            {
+                if (int.TryParse(selectedSizeItem.Content.ToString(), out int fontSize))
+                {
+                    textViewer.SetFontSize(fontSize);
+                }
+            }
             textViewer.Focus();
         }
 
         private void normalButton_Click(object sender, RoutedEventArgs e)
         {
+            FontStyle fontStyle = FontStyles.Normal;
+            textViewer.SetFontStyleForSelection(fontStyle);
+
             textViewer.Focus();
         }
 
         private void italicButton_Click(object sender, RoutedEventArgs e)
         {
+            FontStyle fontStyle = FontStyles.Italic;
+            textViewer.SetFontStyleForSelection(fontStyle);
+
             textViewer.Focus();
         }
 
         private void boldButton_Click(object sender, RoutedEventArgs e)
         {
+
+            FontStyle fontStyle = FontStyles.Oblique;
+            textViewer.SetFontStyleForSelection(fontStyle);
+
             textViewer.Focus();
         }
 
         private void searchButton_Click(object sender, RoutedEventArgs e)
         {
+            string searchText = searchTextBox.Text;
 
+            if (!string.IsNullOrEmpty(searchText))
+            {
+                textViewer.FindAndSelect(searchText);
+            }
+            textViewer.Focus();
+        }
+
+        private void UndoButton_Click(object sender, RoutedEventArgs e)
+        {
+            textViewer.Undo();
+            textViewer.Focus();
+        }
+
+        private void RedoButton_Click(object sender, RoutedEventArgs e)
+        {
+            textViewer.Redo();
+            textViewer.Focus();
         }
     }
 }

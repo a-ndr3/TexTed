@@ -27,6 +27,7 @@ namespace TexTed
         private PieceList pieceList;
         private int caretPosition;
         private bool showCaret;
+
         public string FilePath
         {
             set
@@ -73,62 +74,69 @@ namespace TexTed
         {
             base.OnRender(drawingContext);
 
-            //pieceList.SaveFileTest();
-
-            //var pieces = pieceList.GetAllText();
-
-            var head = pieceList.GetHead();
-            double lineHeight = GetLineHeight(head);
-            Point start = new Point(0, lineHeight);
-
-            while (head != null)
+            try
             {
-                var typeFace = new Typeface(head.Font, head.Style, FontWeights.Normal, FontStretches.Normal);
+                //pieceList.SaveFileTest();
 
-                string text = head.GetText();
+                //var pieces = pieceList.GetAllText();
 
-                var lines = text.Split('\n');
+                var head = pieceList.GetHead();
+                double lineHeight = GetLineHeight(head);
+                Point start = new Point(0, lineHeight);
 
-                GlyphTypeface glyphTypeface;
-
-                if (!typeFace.TryGetGlyphTypeface(out glyphTypeface))
+                while (head != null)
                 {
-                    throw new InvalidOperationException("No glyph typeface found");
+                    var typeFace = new Typeface(head.Font, head.Style, FontWeights.Normal, FontStretches.Normal);
+
+                    string text = head.GetText();
+
+                    var lines = text.Split('\n');
+
+                    GlyphTypeface glyphTypeface;
+
+                    if (!typeFace.TryGetGlyphTypeface(out glyphTypeface))
+                    {
+                        throw new InvalidOperationException("No glyph typeface found");
+                    }
+
+                    var i = 0;
+                    foreach (var line in lines)
+                    {
+                        lineHeight = GetLineHeight(head);
+
+                        if (i > 0)
+                        {
+                            start.Y += GetLineHeight(head.Next ?? head); start.X = 0;
+                        }
+                        i++;
+
+                        if (!string.IsNullOrEmpty(line))
+                        {
+                            DrawTextLine(drawingContext, line, start, head.FontSize, glyphTypeface);
+                            start.X += MeasureTextWidth(line, head.FontSize, typeFace);
+                        }
+                    }
+
+                    head = head.Next;
                 }
 
-                var i = 0;
-                foreach (var line in lines)
+                if (showCaret)
                 {
-                    lineHeight = GetLineHeight(head);
+                    var piece = GetPieceFromCaretPosition(caretPosition);
+                    var caretLocation = GetCaretPointUpd(caretPosition);
+                    lineHeight = GetLineHeight(piece.Next ?? piece);
 
-                    if (i > 0)
-                    {
-                        start.Y += GetLineHeight(head.Next ?? head); start.X = 0;
-                    }
-                    i++;
-
-                    if (!string.IsNullOrEmpty(line))
-                    {
-                        DrawTextLine(drawingContext, line, start, head.FontSize, glyphTypeface);
-                        start.X += MeasureTextWidth(line, head.FontSize, typeFace);
-                    }
+                    DrawCaretN(drawingContext, piece, caretLocation, lineHeight);
                 }
 
-                head = head.Next;
+                if (selectionStart != -1 && selectionEnd != -1 && selectionStart != selectionEnd)
+                {
+                    DrawSelection(drawingContext);
+                }
             }
-
-            if (showCaret)
+            catch (Exception ex)
             {
-                var piece = GetPieceFromCaretPosition(caretPosition);
-                var caretLocation = GetCaretPointUpd(caretPosition);
-                lineHeight = GetLineHeight(piece.Next ?? piece);
-
-                DrawCaretN(drawingContext, piece, caretLocation, lineHeight);
-            }
-
-            if (selectionStart != -1 && selectionEnd != -1 && selectionStart != selectionEnd)
-            {
-                DrawSelection(drawingContext);
+                Debug.WriteLine(ex.ToString());
             }
 
         }
@@ -367,11 +375,20 @@ namespace TexTed
         {
             base.OnTextInput(e);
 
+            //foreach (char c in e.Text)
+            //{
+            //    if (!char.IsControl(c))
+            //    {
+            //        pieceList.InsertUpdated(caretPosition, c);
+            //        caretPosition++;
+            //    }
+            //}
+
             foreach (char c in e.Text)
             {
                 if (!char.IsControl(c))
                 {
-                    pieceList.InsertUpdated(caretPosition, c);
+                    InsertCommand(c);
                     caretPosition++;
                 }
             }
@@ -422,12 +439,15 @@ namespace TexTed
                 case Key.Back:
                     if (caretPosition > 0)
                     {
-                        pieceList.Delete(caretPosition - 1, caretPosition);
+                        //pieceList.Delete(caretPosition - 1, caretPosition);
+                        DeleteCommand();
+
                         caretPosition--;
                     }
                     break;
                 case Key.Enter:
-                    pieceList.InsertUpdated(caretPosition, '\n');
+                   // pieceList.InsertUpdated(caretPosition, '\n');
+                    InsertCommand('\n');
                     caretPosition++;
                     break;
                 case Key.Up:
@@ -445,27 +465,34 @@ namespace TexTed
         {
             base.OnMouseDown(e);
 
-            Point mousePosition = e.GetPosition(this);
-            int clickedPosition = GetCaretIndexFromPoint(mousePosition);
-
-            if (e.ClickCount == 1)
+            try
             {
-                caretPosition = clickedPosition;
-                ClearSelection();
+                Point mousePosition = e.GetPosition(this);
+                int clickedPosition = GetCaretIndexFromPoint(mousePosition);
 
-                // selection
-                selectionStart = clickedPosition;
-                selectionEnd = selectionStart;
+                if (e.ClickCount == 1)
+                {
+                    caretPosition = clickedPosition;
+                    ClearSelection();
 
+                    // selection
+                    selectionStart = clickedPosition;
+                    selectionEnd = selectionStart;
+
+                }
+                else if (e.ClickCount == 2) // selection of a word
+                {
+                    (selectionStart, selectionEnd) = GetWordBoundaries(clickedPosition);
+                    caretPosition = selectionEnd;
+                }
+
+                InvalidateVisual();
+                CaptureMouse();
             }
-            else if (e.ClickCount == 2) // selection of a word
+            catch (Exception ex)
             {
-                (selectionStart, selectionEnd) = GetWordBoundaries(clickedPosition);
-                caretPosition = selectionEnd;
+                Debug.WriteLine(ex.ToString());
             }
-
-            InvalidateVisual();
-            CaptureMouse();
         }
         protected override void OnMouseMove(MouseEventArgs e)
         {
@@ -778,7 +805,7 @@ namespace TexTed
             return null;
         }
 
-        private string GetSelectedText()
+        public string GetSelectedText()
         {
             if (selectionStart == -1 || selectionEnd == -1 || selectionStart == selectionEnd)
                 return string.Empty;
@@ -810,11 +837,16 @@ namespace TexTed
 
         private void Cut()
         {
-            Copy();
-
             if (selectionStart != -1 && selectionEnd != -1)
             {
-                pieceList.Delete(selectionStart, selectionEnd);
+                Copy();
+                // pieceList.Delete(selectionStart, selectionEnd);
+
+                CutCommand cutCommand = new CutCommand(pieceList, selectionStart, selectionEnd, GetSelectedPiece(), GetSelectedText());
+                cutCommand.Execute();
+                undoStack.Push(cutCommand);
+                redoStack.Clear();
+
                 caretPosition = selectionStart;
                 ClearSelection();
 
@@ -828,9 +860,15 @@ namespace TexTed
             {
                 ClipboardData data = AppClipboard.ClipboardContent;
 
-                pieceList.Insert(caretPosition, data.Text, data.Font, data.Style, data.FontSize);
+               // pieceList.Insert(caretPosition, data.Text, data.Font, data.Style, data.FontSize);
+
+                PasteCommand pasteCommand = new PasteCommand(pieceList, caretPosition, data.Text);
+                pasteCommand.Execute();
+                undoStack.Push(pasteCommand);
+                redoStack.Clear();
 
                 caretPosition += data.Text.Length;
+                ClearSelection();
 
                 InvalidateVisual();
             }
@@ -865,7 +903,7 @@ namespace TexTed
 
             if (foundIndex != -1)
             {
-                caretPosition = foundIndex;
+                caretPosition = foundIndex + searchString.Length;
                 selectionStart = foundIndex;
                 selectionEnd = foundIndex + searchString.Length;
 
@@ -879,11 +917,117 @@ namespace TexTed
         {
             OnKeyDown(keyArgs);
         }
+
+        public void SetFontStyleForSelection(FontStyle fontStyle)
+        {
+            if (selectionStart == -1 || selectionEnd == -1 || selectionStart == selectionEnd)
+                return;
+
+            Piece startPiece = pieceList.Split(selectionStart);
+            Piece endPiece = pieceList.Split(selectionEnd);
+
+            Piece currentPiece = startPiece;
+
+
+            while (currentPiece != null && currentPiece != endPiece)
+            {
+                currentPiece.Style = fontStyle;
+                currentPiece = currentPiece.Next;
+            }
+
+            InvalidateVisual();
+        }
+
+        internal void SetFont(FontFamily fontFamily)
+        {
+            if (selectionStart == -1 || selectionEnd == -1 || selectionStart == selectionEnd)
+                return;
+
+            Piece startPiece = pieceList.Split(selectionStart);
+            Piece endPiece = pieceList.Split(selectionEnd);
+
+            Piece currentPiece = startPiece;
+
+
+            while (currentPiece != null && currentPiece != endPiece)
+            {
+                currentPiece.Font = fontFamily;
+                currentPiece = currentPiece.Next;
+            }
+
+            endPiece.Font = fontFamily;
+
+            InvalidateVisual();
+        }
+
+        internal void SetFontSize(int size)
+        {
+            if (selectionStart == -1 || selectionEnd == -1 || selectionStart == selectionEnd)
+                return;
+
+            Piece startPiece = pieceList.Split(selectionStart);
+            Piece endPiece = pieceList.Split(selectionEnd);
+
+            Piece currentPiece = startPiece;
+
+
+            while (currentPiece != null && currentPiece != endPiece)
+            {
+                currentPiece.FontSize = size;
+                currentPiece = currentPiece.Next;
+            }
+
+            endPiece.FontSize = size;
+
+            InvalidateVisual();
+        }
+
+
+        private Stack<ICommand> undoStack = new Stack<ICommand>();
+        private Stack<ICommand> redoStack = new Stack<ICommand>();
+
+        public void PerformAction(ICommand command)
+        {
+            command.Execute();
+            undoStack.Push(command);
+            redoStack.Clear();
+        }
+
+        public void Undo()
+        {
+            if (undoStack.Count > 0)
+            {
+                ICommand command = undoStack.Pop();
+                command.Undo();
+                redoStack.Push(command);
+            }
+        }
+
+        public void Redo()
+        {
+            if (redoStack.Count > 0)
+            {
+                ICommand command = redoStack.Pop();
+                command.Execute();
+                undoStack.Push(command);
+            }
+        }
+
+        private void DeleteCommand()
+        {
+            var deleteCommand = new DeleteCommand(pieceList, caretPosition - 1, caretPosition);
+            deleteCommand.Execute();
+            undoStack.Push(deleteCommand);
+            redoStack.Clear();
+        }
+
+        private void InsertCommand(char ch)
+        {
+            var insertCommand = new InsertCommand(pieceList, caretPosition, ch);
+            insertCommand.Execute();
+            undoStack.Push(insertCommand);
+            redoStack.Clear();
+        }
     }
+
 }
-
-
-// MUST HAVE TODO LIST
-
-//todo: add undo/redo
-//todo: add drag&drop text file
