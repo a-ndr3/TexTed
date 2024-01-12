@@ -11,7 +11,7 @@ using Newtonsoft.Json;
 using System.Reflection;
 using System.Windows.Media.Media3D;
 
-namespace TexTed
+namespace TexTed.PieceBase
 {
     internal class PieceList
     {
@@ -69,11 +69,12 @@ namespace TexTed
                 File.Delete(filePath + ".scratch");
             }
 
-            this.scratchFilePath = filePath + ".scratch";
+            scratchFilePath = filePath + ".scratch";
 
             head = null;
             LoadFile();
         }
+
 
         private void LoadFile()
         {
@@ -243,7 +244,7 @@ namespace TexTed
             Metadata metadata = new Metadata();
 
             Piece current = head;
-            
+
             int i = 0;
             while (current != null)
             {
@@ -397,7 +398,7 @@ namespace TexTed
                 return;
 
             Piece currentPiece = Split(caretPosition);
-            long filePos = (currentPiece != null) ? currentPiece.FilePos + currentPiece.Length : 0;
+            long filePos = currentPiece != null ? currentPiece.FilePos + currentPiece.Length : 0;
 
             Piece newPiece = new Piece(text.Length, scratchFilePath, filePos, font, style, fontSize);
             AddPieceToFile(text, newPiece);

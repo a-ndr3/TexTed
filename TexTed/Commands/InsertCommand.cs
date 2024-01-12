@@ -5,8 +5,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows;
+using TexTed.PieceBase;
 
-namespace TexTed
+namespace TexTed.Commands
 {
     internal class InsertCommand : ICommand
     {

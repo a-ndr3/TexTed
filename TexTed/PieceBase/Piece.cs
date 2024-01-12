@@ -8,7 +8,7 @@ using static System.Net.Mime.MediaTypeNames;
 using System.Windows;
 using System.Windows.Media;
 
-namespace TexTed
+namespace TexTed.PieceBase
 {
     internal class Piece
     {
@@ -54,7 +54,7 @@ namespace TexTed
             }
             catch (Exception ex)
             {
-                
+
                 throw;
             }
 

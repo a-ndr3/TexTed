@@ -137,7 +137,7 @@ namespace TexTed
             textViewer.Focus();
         }
 
-        private void boldButton_Click(object sender, RoutedEventArgs e)
+        private void OblButton_Click(object sender, RoutedEventArgs e)
         {
 
             FontStyle fontStyle = FontStyles.Oblique;

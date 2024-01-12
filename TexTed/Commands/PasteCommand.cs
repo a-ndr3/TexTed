@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TexTed.Clipboard;
+using TexTed.PieceBase;
 
-namespace TexTed
+namespace TexTed.Commands
 {
     internal class PasteCommand : ICommand
     {
@@ -15,7 +17,7 @@ namespace TexTed
         public PasteCommand(PieceList pieceList, int pos, string text)
         {
             this.pieceList = pieceList;
-            this.position = pos;
+            position = pos;
             this.text = text;
         }
 

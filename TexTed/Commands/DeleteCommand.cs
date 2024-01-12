@@ -5,30 +5,31 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows;
+using TexTed.PieceBase;
 
-namespace TexTed
+namespace TexTed.Commands
 {
-    internal class CutCommand : ICommand
+    internal class DeleteCommand : ICommand
     {
         private PieceList pieceList;
-        private string deletedText;
         private int startPosition;
         private int endPosition;
+        private string deletedText;
         private FontFamily font;
         private FontStyle style;
         private int fontSize;
 
-        public CutCommand(PieceList pieceList, int start, int end, Piece piece, String deletedText)
+        public DeleteCommand(PieceList pieceList, int startPosition, int endPosition, Piece piece)
         {
             this.pieceList = pieceList;
-            this.startPosition = start;
-            this.endPosition = end;
+            this.startPosition = startPosition;
+            this.endPosition = endPosition;
 
-            this.deletedText = deletedText;
+            deletedText = pieceList.GetAllText().Substring(startPosition, 1);
 
-            this.font = piece.Font;
-            this.style = piece.Style;
-            this.fontSize = piece.FontSize;
+            fontSize = piece.FontSize;
+            font = piece.Font;
+            style = piece.Style;
         }
 
         public void Execute()

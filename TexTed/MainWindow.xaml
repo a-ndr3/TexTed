@@ -38,8 +38,8 @@
                     <ComboBoxItem Content="48"/>
                     <ComboBoxItem Content="72"/>
                 </ComboBox>
-                <Button x:Name="boldButton" Width="30" Click="boldButton_Click" ToolTip="Bold">
-                    <TextBlock FontWeight="Bold">B</TextBlock>
+                <Button x:Name="oblButton" Width="30" Click="OblButton_Click" ToolTip="Oblique">
+                    <TextBlock FontStyle="Oblique">O</TextBlock>
                 </Button>
                 <Button x:Name="italicButton" Width="30" Click="italicButton_Click" ToolTip="Italic">
                     <TextBlock FontStyle="Italic">I</TextBlock>

@@ -9,12 +9,11 @@ using System.Windows.Media;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
-using System.Windows.Media.TextFormatting;
-using static System.Net.Mime.MediaTypeNames;
-using System.Collections;
-using System.Data.Common;
-using System.Windows.Shapes;
 using System.Diagnostics;
+using TexTed.Commands;
+using ICommand = TexTed.Commands.ICommand;
+using TexTed.Clipboard;
+using TexTed.PieceBase;
 
 namespace TexTed
 {
@@ -45,13 +44,16 @@ namespace TexTed
         private int selectionStart = -1;
         private int selectionEnd = -1;
 
+        private Stack<ICommand> undoStack = new Stack<ICommand>();
+        private Stack<ICommand> redoStack = new Stack<ICommand>();
+
         public TextViewer()
         {
-            this.caretPosition = 0;
-            this.showCaret = true;
-            this.Focusable = true;
+            caretPosition = 0;
+            showCaret = true;
+            Focusable = true;
 
-            this.Loaded += (sender, args) => Keyboard.Focus(this);
+            Loaded += (sender, args) => Keyboard.Focus(this);
 
             InitializeCaretBlinking();
         }
@@ -76,10 +78,6 @@ namespace TexTed
 
             try
             {
-                //pieceList.SaveFileTest();
-
-                //var pieces = pieceList.GetAllText();
-
                 var head = pieceList.GetHead();
                 double lineHeight = GetLineHeight(head);
                 Point start = new Point(0, lineHeight);
@@ -247,7 +245,7 @@ namespace TexTed
 
 
 
-        //влево и врпаво до \n
+        //влево и вправо до \n
         private int GetMaxHeightStartingFromPiece(Piece piece)
         {
             var maxHeight = 1; var localPiece = piece;
@@ -446,7 +444,7 @@ namespace TexTed
                     }
                     break;
                 case Key.Enter:
-                   // pieceList.InsertUpdated(caretPosition, '\n');
+                    // pieceList.InsertUpdated(caretPosition, '\n');
                     InsertCommand('\n');
                     caretPosition++;
                     break;
@@ -597,6 +595,10 @@ namespace TexTed
             return width;
         }
 
+        internal void HandleArrowKeyPress(KeyEventArgs keyArgs)
+        {
+            OnKeyDown(keyArgs);
+        }
 
 
         #region Selection
@@ -723,7 +725,7 @@ namespace TexTed
                                 charWidth = MeasureTextWidth("M", currentPiece.FontSize, new Typeface(currentPiece.Font, currentPiece.Style, FontWeights.Normal, FontStretches.Normal));
                             }
 
-                            if (point.X <= x + (charWidth / 2))
+                            if (point.X <= x + charWidth / 2)
                             {
                                 return accumulatedLength + j + 1;
                             }
@@ -766,7 +768,6 @@ namespace TexTed
         }
 
         #endregion
-
 
         #region CopyPaste
 
@@ -860,7 +861,7 @@ namespace TexTed
             {
                 ClipboardData data = AppClipboard.ClipboardContent;
 
-               // pieceList.Insert(caretPosition, data.Text, data.Font, data.Style, data.FontSize);
+                // pieceList.Insert(caretPosition, data.Text, data.Font, data.Style, data.FontSize);
 
                 PasteCommand pasteCommand = new PasteCommand(pieceList, caretPosition, data.Text);
                 pasteCommand.Execute();
@@ -913,27 +914,17 @@ namespace TexTed
 
         #endregion
 
-        internal void HandleArrowKeyPress(KeyEventArgs keyArgs)
-        {
-            OnKeyDown(keyArgs);
-        }
-
+        #region FontStyleChanges
         public void SetFontStyleForSelection(FontStyle fontStyle)
         {
             if (selectionStart == -1 || selectionEnd == -1 || selectionStart == selectionEnd)
                 return;
 
-            Piece startPiece = pieceList.Split(selectionStart);
-            Piece endPiece = pieceList.Split(selectionEnd);
+            ChangeStyleCommand changeStyleCommand = new ChangeStyleCommand(GetSelectedPiece(), fontStyle);
+            changeStyleCommand.Execute();
+            undoStack.Push(changeStyleCommand);
+            redoStack.Clear();
 
-            Piece currentPiece = startPiece;
-
-
-            while (currentPiece != null && currentPiece != endPiece)
-            {
-                currentPiece.Style = fontStyle;
-                currentPiece = currentPiece.Next;
-            }
 
             InvalidateVisual();
         }
@@ -943,19 +934,10 @@ namespace TexTed
             if (selectionStart == -1 || selectionEnd == -1 || selectionStart == selectionEnd)
                 return;
 
-            Piece startPiece = pieceList.Split(selectionStart);
-            Piece endPiece = pieceList.Split(selectionEnd);
-
-            Piece currentPiece = startPiece;
-
-
-            while (currentPiece != null && currentPiece != endPiece)
-            {
-                currentPiece.Font = fontFamily;
-                currentPiece = currentPiece.Next;
-            }
-
-            endPiece.Font = fontFamily;
+            ChangeStyleCommand changeStyleCommand = new ChangeStyleCommand(GetSelectedPiece(), fontFamily);
+            changeStyleCommand.Execute();
+            undoStack.Push(changeStyleCommand);
+            redoStack.Clear();
 
             InvalidateVisual();
         }
@@ -965,26 +947,16 @@ namespace TexTed
             if (selectionStart == -1 || selectionEnd == -1 || selectionStart == selectionEnd)
                 return;
 
-            Piece startPiece = pieceList.Split(selectionStart);
-            Piece endPiece = pieceList.Split(selectionEnd);
-
-            Piece currentPiece = startPiece;
-
-
-            while (currentPiece != null && currentPiece != endPiece)
-            {
-                currentPiece.FontSize = size;
-                currentPiece = currentPiece.Next;
-            }
-
-            endPiece.FontSize = size;
+            ChangeStyleCommand changeStyleCommand = new ChangeStyleCommand(GetSelectedPiece(), size);
+            changeStyleCommand.Execute();
+            undoStack.Push(changeStyleCommand);
+            redoStack.Clear();
 
             InvalidateVisual();
         }
+        #endregion
 
-
-        private Stack<ICommand> undoStack = new Stack<ICommand>();
-        private Stack<ICommand> redoStack = new Stack<ICommand>();
+        #region Commands
 
         public void PerformAction(ICommand command)
         {
@@ -1015,7 +987,7 @@ namespace TexTed
 
         private void DeleteCommand()
         {
-            var deleteCommand = new DeleteCommand(pieceList, caretPosition - 1, caretPosition);
+            var deleteCommand = new DeleteCommand(pieceList, caretPosition - 1, caretPosition, GetPieceFromCaretPosition(caretPosition));
             deleteCommand.Execute();
             undoStack.Push(deleteCommand);
             redoStack.Clear();
@@ -1028,6 +1000,8 @@ namespace TexTed
             undoStack.Push(insertCommand);
             redoStack.Clear();
         }
+
+        #endregion
     }
 
 }
