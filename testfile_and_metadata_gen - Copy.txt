@@ -1,0 +1,20 @@
+{
+  "Pieces": [
+    {
+      "Start": 310,
+      "Length": 6,
+      "Font": "Arial",
+      "FontSize": 12,
+      "Style": "Normal"
+    },
+    {
+      "Start": 316,
+      "Length": 13,
+      "Font": "Times New Roman",
+      "FontSize": 24,
+      "Style": "Italic"
+    }
+  ]
+}
+<<END_METADATA>>
+Ahoy! Matey! Yarr! 

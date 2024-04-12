@@ -5,8 +5,62 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:TexTed"
         mc:Ignorable="d"
-        Title="TexTed" Height="650" Width="800">
+        Title="TexTed" Height="650" Width="800" Background="LightSteelBlue" Icon="/texted_logo1.ico">
     <Grid>
-        <local:TextViewer x:Name="textViewer" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border CornerRadius="1" BorderBrush="Transparent" Background="LightSteelBlue" BorderThickness="3.5">
+            <DockPanel Background="LightSteelBlue" Grid.Row="0" Width="575">
+                <Button x:Name="openButton" Content="Open" Click="openButton_Click" ToolTip="Open file in the new window"/>
+                <Button x:Name="saveButton" Content="Save" Click="saveButton_Click" ToolTip="Save current document"/>
+                <ComboBox x:Name="fontComboBox" Width="100" SelectionChanged="fontComboBox_SelectionChanged"
+             Text="Font" ToolTip="Font type">
+                    <ComboBoxItem Content="Arial"/>
+                    <ComboBoxItem Content="Courier New"/>
+                    <ComboBoxItem Content="Times New Roman"/>
+                </ComboBox>
+                <ComboBox x:Name="fontSizeComboBox" Width="50" SelectionChanged="fontSizeComboBox_SelectionChanged" ToolTip="Font size">
+                    <ComboBoxItem Content="8"/>
+                    <ComboBoxItem Content="10"/>
+                    <ComboBoxItem Content="12"/>
+                    <ComboBoxItem Content="14"/>
+                    <ComboBoxItem Content="16"/>
+                    <ComboBoxItem Content="18"/>
+                    <ComboBoxItem Content="20"/>
+                    <ComboBoxItem Content="22"/>
+                    <ComboBoxItem Content="24"/>
+                    <ComboBoxItem Content="26"/>
+                    <ComboBoxItem Content="28"/>
+                    <ComboBoxItem Content="36"/>
+                    <ComboBoxItem Content="48"/>
+                    <ComboBoxItem Content="72"/>
+                </ComboBox>
+                <Button x:Name="oblButton" Width="30" Click="OblButton_Click" ToolTip="Oblique">
+                    <TextBlock FontStyle="Oblique">O</TextBlock>
+                </Button>
+                <Button x:Name="italicButton" Width="30" Click="italicButton_Click" ToolTip="Italic">
+                    <TextBlock FontStyle="Italic">I</TextBlock>
+                </Button>
+                <Button x:Name="normalButton" Width="30" Click="normalButton_Click" ToolTip="Normal">
+                    <TextBlock>N</TextBlock>
+                </Button>
+                <TextBox x:Name="searchTextBox" BorderThickness="1" BorderBrush="Black" Width="120" Margin="5,0,5,0" ToolTip="Enter text to search"/>
+                <Button x:Name="searchButton" Content="Search" Click="searchButton_Click" Width="60"/>
+                <Button Content="Undo" Click="UndoButton_Click" Width="40"/>
+                <Button Content="Redo" Click="RedoButton_Click" Width="40"/>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Row="1" BorderBrush="Transparent" BorderThickness="0" CornerRadius="3" Padding="0" Background="#FAFAFA">
+            <Canvas Margin="5">
+                <local:TextViewer x:Name="textViewer" PreviewKeyDown="TextViewer_PreviewKeyDown"/>
+            </Canvas>
+        </Border>
+
+        <ScrollBar x:Name="verticalScrollBar" Orientation="Vertical" VerticalAlignment="Stretch" HorizontalAlignment="Right" Grid.Row="1" ValueChanged="verticalScrollBar_ValueChanged"/>
+        <ScrollBar x:Name="horizontalScrollBar" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Grid.Row="1" ValueChanged="horizontalScrollBar_ValueChanged"/>
     </Grid>
 </Window>
